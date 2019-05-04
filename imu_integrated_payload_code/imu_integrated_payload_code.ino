@@ -19,8 +19,6 @@ Intersema::BaroPressure_MS5607B baro(true);    //The file named IntersemaBaro.h 
 int intPin = 12;  // These can be changed, 2 and 3 are the Arduinos ext int pins
 int myLed  = 13;  // Set up pin 13 led for toggling
 
-int apogeePyroCircuit = 2;    //set to the digital pin that the apogee pyro channel is connected to
-int lowAltitudePyroCircuit = 3;   //set to digital pin that programmable pyro channel is connected to
 int solenoid = 27;            // set to the digital pin that the solenoid valve is connected to
 int vacuumPump1 = 25;        // set to the digital pins that pumps are connected to
 int vacuumPump2 = 26;
@@ -28,13 +26,13 @@ int vacuumPump2 = 26;
 int heightVariable = 0;
 int pumpVariable = 0;
 
-int vibx = A0;                //set to the analog pins that the vibration sensors are connected to
-int viby = A2;
-int vibz = A4;
+//int vibx = A0;                //set to the analog pins that the vibration sensors are connected to
+//int viby = A2;
+//int vibz = A4;
   
-int valx = 0;
-int valy = 0;
-int valz = 0;
+//int valx = 0;
+//int valy = 0;
+//int valz = 0;
 
 unsigned long time;
 
@@ -53,14 +51,9 @@ Serial.begin(9600);
   // TWBR = 12;  // 400 kbit/sec I2C speed
  
 baro.init();
-pinMode(apogeePyroCircuit,INPUT);
-pinMode(lowAltitudePyroCircuit, INPUT);
 pinMode(solenoid,OUTPUT);
 pinMode(vacuumPump1,OUTPUT);
 pinMode(vacuumPump2,OUTPUT);
-pinMode(vibx, INPUT);
-pinMode(viby, INPUT);
-pinMode(vibz, INPUT);
 if (!SD.begin(chipSelect)) {
     Serial.println("Card failed, or not present");
                                                              // if SD card is not present, won't do anything more:
@@ -243,18 +236,16 @@ if (!SD.begin(chipSelect)) {
     Serial.flush();
     abort();
   }
-  Serial.println("Time    vibx    viby    vibz");
-  datalog.println("Time    vibx    viby    vibz");
+  
 
 }
 
 void loop() {
-  valx = analogRead(vibx);
-  valy = analogRead(viby);
-  valz = analogRead(vibz);
+
   time = millis();
   int alt = baro.getHeightCentiMeters();
   int feet = (float)(alt) / 30.48;
+  int meters = (float)(alt) / 100;
 
   if (myIMU.readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01)
     {
@@ -297,24 +288,18 @@ void loop() {
 
   
   Serial.print(time);           //recording vibration data in serial monitor
-  Serial.print(",   ");
-  Serial.print(vibx);
-  Serial.print(",   ");
-  Serial.print(viby);
-  Serial.print(",   ");
-  Serial.println(vibz);
+ 
   Serial.print(", Feet: ");
-  Serial.println((float)(alt) / 30.48);
+  Serial.print(feet);
+  Serial.print(", Meters: ");
+  Serial.println(meters);
 
   datalog.print(time);        //recording vibration data in SD card
-  datalog.print(",   ");
-  datalog.print(vibx);
-  datalog.print(",   ");
-  datalog.print(viby);
-  datalog.print(",   ");
-  datalog.println(vibz);
+ 
   datalog.print(", Feet: ");
-  datalog.println((float)(alt) / 30.48);
+  datalog.print(feet);
+  datalog.print(" Meters: ");
+  datalog.println(meters);
 
   if (!AHRS)
     {
@@ -413,15 +398,15 @@ void loop() {
         Serial.print(" qy = "); Serial.print(*(getQ() + 2));
         Serial.print(" qz = "); Serial.println(*(getQ() + 3));
 
-        Serial.print("ax = ");  Serial.print((int)1000 * myIMU.ax);
-        Serial.print(" ay = "); Serial.print((int)1000 * myIMU.ay);
-        Serial.print(" az = "); Serial.print((int)1000 * myIMU.az);
-        Serial.println(" mg");
+        datalog.print("ax = ");  datalog.print((int)1000 * myIMU.ax);
+        datalog.print(" ay = "); datalog.print((int)1000 * myIMU.ay);
+        datalog.print(" az = "); datalog.print((int)1000 * myIMU.az);
+        datalog.println(" mg");
 
-        Serial.print("gx = ");  Serial.print(myIMU.gx, 2);
-        Serial.print(" gy = "); Serial.print(myIMU.gy, 2);
-        Serial.print(" gz = "); Serial.print(myIMU.gz, 2);
-        Serial.println(" deg/s");
+        datalog.print("gx = ");  datalog.print(myIMU.gx, 2);
+        datalog.print(" gy = "); datalog.print(myIMU.gy, 2);
+        datalog.print(" gz = "); datalog.print(myIMU.gz, 2);
+        datalog.println(" deg/s");
 
         datalog.print("mx = ");  datalog.print((int)myIMU.mx);
         datalog.print(" my = "); datalog.print((int)myIMU.my);
@@ -490,7 +475,7 @@ void loop() {
       }
     }
     if (heightVariable = 1){
-      if (feet <= 29500){
+      if ((1000 * myIMU.ay) < -500){
         pumpVariable = 1;
       }
     }
