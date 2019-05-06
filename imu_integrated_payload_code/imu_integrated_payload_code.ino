@@ -16,8 +16,7 @@
 
 Intersema::BaroPressure_MS5607B baro(true);    //The file named IntersemaBaro.h must be in the same folder as this code file
 
-int intPin = 12;  // These can be changed, 2 and 3 are the Arduinos ext int pins
-int myLed  = 13;  // Set up pin 13 led for toggling
+
 
 int solenoid = 27;            // set to the digital pin that the solenoid valve is connected to
 int vacuumPump1 = 25;        // set to the digital pins that pumps are connected to
@@ -25,14 +24,7 @@ int vacuumPump2 = 26;
 
 int heightVariable = 0;
 int pumpVariable = 0;
-
-//int vibx = A0;                //set to the analog pins that the vibration sensors are connected to
-//int viby = A2;
-//int vibz = A4;
-  
-//int valx = 0;
-//int valy = 0;
-//int valz = 0;
+                              //SCL is pin 19 and SDL is pin 18
 
 unsigned long time;
 
@@ -48,7 +40,7 @@ void setup() {
 Serial.begin(9600);
 
  Wire.begin();
-  // TWBR = 12;  // 400 kbit/sec I2C speed
+                                                         // TWBR = 12;  // 400 kbit/sec I2C speed
  
 baro.init();
 pinMode(solenoid,OUTPUT);
@@ -61,15 +53,10 @@ if (!SD.begin(chipSelect)) {
   }
   Serial.println("card initialized.");
 
-  while(!Serial){};
 
-  // Set up the interrupt pin, its set as active high, push-pull
-  pinMode(intPin, INPUT);
-  digitalWrite(intPin, LOW);
-  pinMode(myLed, OUTPUT);
-  digitalWrite(myLed, HIGH);
 
-  // Read the WHO_AM_I register, this is a good test of communication
+
+                                                       // Read the WHO_AM_I register, this is a good test of communication
   byte c = myIMU.readByte(MPU9250_ADDRESS, WHO_AM_I_MPU9250);
   Serial.print(F("MPU9250 I AM 0x"));
   Serial.print(c, HEX);
@@ -81,12 +68,12 @@ if (!SD.begin(chipSelect)) {
   datalog.print(F(" I should be 0x"));
   datalog.println(0x71, HEX);
 
- if (c == 0x71) // WHO_AM_I should always be 0x71
+ if (c == 0x71)                                         // WHO_AM_I should always be 0x71
   {
     Serial.println(F("MPU9250 is online..."));
     datalog.println(F("MPU9250 is online..."));
 
-    // Start by performing self test and reporting values
+                                                       // Start by performing self test and reporting values
     myIMU.MPU9250SelfTest(myIMU.selfTest);
     Serial.print(F("x-axis self test: acceleration trim within : "));
     Serial.print(myIMU.selfTest[0],1); Serial.println("% of factory value");
@@ -114,17 +101,17 @@ if (!SD.begin(chipSelect)) {
     datalog.print(F("z-axis self test: gyration trim within : "));
     datalog.print(myIMU.selfTest[5],1); Serial.println("% of factory value");
 
-    // Calibrate gyro and accelerometers, load biases in bias registers
+                                                      // Calibrate gyro and accelerometers, load biases in bias registers
     myIMU.calibrateMPU9250(myIMU.gyroBias, myIMU.accelBias);
 
     myIMU.initMPU9250();
-    // Initialize device for active mode read of acclerometer, gyroscope, and
-    // temperature
+                                                    // Initialize device for active mode read of acclerometer, gyroscope, and
+                                                    // temperature
     Serial.println("MPU9250 initialized for active data mode....");
     datalog.println("MPU9250 initialized for active data mode....");
 
-    // Read the WHO_AM_I register of the magnetometer, this is a good test of
-    // communication
+                                                    // Read the WHO_AM_I register of the magnetometer, this is a good test of
+                                                   // communication
     byte d = myIMU.readByte(AK8963_ADDRESS, WHO_AM_I_AK8963);
     Serial.print("AK8963 ");
     Serial.print("I AM 0x");
@@ -141,22 +128,22 @@ if (!SD.begin(chipSelect)) {
 
     if (d != 0x48)
     {
-      // Communication failed, stop here
+                                                     // Communication failed, stop here
       Serial.println(F("Communication failed, abort!"));
       datalog.println(F("Communication failed, abort!"));
       Serial.flush();
       abort();
     }
 
-    // Get magnetometer calibration from AK8963 ROM
+                                                      // Get magnetometer calibration from AK8963 ROM
     myIMU.initAK8963(myIMU.factoryMagCalibration);
-    // Initialize device for active mode read of magnetometer
+                                                     // Initialize device for active mode read of magnetometer
     Serial.println("AK8963 initialized for active data mode....");
     datalog.println("AK8963 initialized for active data mode....");
 
     if (SerialDebug)
     {
-      //  Serial.println("Calibration values: ");
+      Serial.println("Calibration values: ");
       Serial.print("X-Axis factory sensitivity adjustment value ");
       Serial.println(myIMU.factoryMagCalibration[0], 2);
       Serial.print("Y-Axis factory sensitivity adjustment value ");
@@ -172,14 +159,14 @@ if (!SD.begin(chipSelect)) {
       datalog.println(myIMU.factoryMagCalibration[2], 2);
     }
 
-    // Get sensor resolutions, only need to do this once
+                                                  // Get sensor resolutions, only need to do this once
     myIMU.getAres();
     myIMU.getGres();
     myIMU.getMres();
 
-    // The next call delays for 4 seconds, and then records about 15 seconds of
-    // data to calculate bias and scale.
-//    myIMU.magCalMPU9250(myIMU.magBias, myIMU.magScale);
+                                                  // The next call delays for 4 seconds, and then records about 15 seconds of
+                                                       // data to calculate bias and scale.
+    myIMU.magCalMPU9250(myIMU.magBias, myIMU.magScale);
     Serial.println("AK8963 mag biases (mG)");
     Serial.println(myIMU.magBias[0]);
     Serial.println(myIMU.magBias[1]);
@@ -220,7 +207,7 @@ if (!SD.begin(chipSelect)) {
       datalog.println(myIMU.factoryMagCalibration[2], 2);
     }
 
-  } // if (c == 0x71)
+  }
   else
   {
     Serial.print("Could not connect to MPU9250: 0x");
@@ -287,19 +274,19 @@ void loop() {
 
 
   
-  Serial.print(time);           //recording vibration data in serial monitor
+  Serial.print(time);           //recording data in serial monitor
  
   Serial.print(", Feet: ");
   Serial.print(feet);
   Serial.print(", Meters: ");
-  Serial.println(meters);
+  Serial.print(meters);
 
-  datalog.print(time);        //recording vibration data in SD card
+  datalog.print(time);        //recording data in SD card
  
   datalog.print(", Feet: ");
   datalog.print(feet);
   datalog.print(" Meters: ");
-  datalog.println(meters);
+  datalog.print(meters);
 
   if (!AHRS)
     {
@@ -309,63 +296,63 @@ void loop() {
       if(SerialDebug)
       {
         // Print acceleration values in milligs!
-        Serial.print("X-acceleration: "); Serial.print(1000 * myIMU.ax);
+        Serial.print(" X-acceleration: "); Serial.print(1000 * myIMU.ax);
         Serial.print(" mg ");
-        Serial.print("Y-acceleration: "); Serial.print(1000 * myIMU.ay);
+        Serial.print(" Y-acceleration: "); Serial.print(1000 * myIMU.ay);
         Serial.print(" mg ");
-        Serial.print("Z-acceleration: "); Serial.print(1000 * myIMU.az);
-        Serial.println(" mg ");
+        Serial.print(" Z-acceleration: "); Serial.print(1000 * myIMU.az);
+        Serial.print(" mg ");
 
-        datalog.print("X-acceleration: "); datalog.print(1000 * myIMU.ax);
+        datalog.print(" X-acceleration: "); datalog.print(1000 * myIMU.ax);
         datalog.print(" mg ");
-        datalog.print("Y-acceleration: "); datalog.print(1000 * myIMU.ay);
+        datalog.print(" Y-acceleration: "); datalog.print(1000 * myIMU.ay);
         datalog.print(" mg ");
-        datalog.print("Z-acceleration: "); datalog.print(1000 * myIMU.az);
-        datalog.println(" mg ");
+        datalog.print(" Z-acceleration: "); datalog.print(1000 * myIMU.az);
+        datalog.print(" mg ");
 
         // Print gyro values in degree/sec
-        Serial.print("X-gyro rate: "); Serial.print(myIMU.gx, 3);
+        Serial.print(" X-gyro rate: "); Serial.print(myIMU.gx, 3);
         Serial.print(" degrees/sec ");
-        Serial.print("Y-gyro rate: "); Serial.print(myIMU.gy, 3);
+        Serial.print(" Y-gyro rate: "); Serial.print(myIMU.gy, 3);
         Serial.print(" degrees/sec ");
-        Serial.print("Z-gyro rate: "); Serial.print(myIMU.gz, 3);
-        Serial.println(" degrees/sec");
+        Serial.print(" Z-gyro rate: "); Serial.print(myIMU.gz, 3);
+        Serial.print(" degrees/sec");
 
-        datalog.print("X-gyro rate: "); datalog.print(myIMU.gx, 3);
+        datalog.print(" X-gyro rate: "); datalog.print(myIMU.gx, 3);
         datalog.print(" degrees/sec ");
-        datalog.print("Y-gyro rate: "); datalog.print(myIMU.gy, 3);
+        datalog.print(" Y-gyro rate: "); datalog.print(myIMU.gy, 3);
         datalog.print(" degrees/sec ");
-        datalog.print("Z-gyro rate: "); datalog.print(myIMU.gz, 3);
-        datalog.println(" degrees/sec");
+        datalog.print(" Z-gyro rate: "); datalog.print(myIMU.gz, 3);
+        datalog.print(" degrees/sec");
 
         // Print mag values in degree/sec
-        Serial.print("X-mag field: "); Serial.print(myIMU.mx);
+        Serial.print(" X-mag field: "); Serial.print(myIMU.mx);
         Serial.print(" mG ");
-        Serial.print("Y-mag field: "); Serial.print(myIMU.my);
+        Serial.print(" Y-mag field: "); Serial.print(myIMU.my);
         Serial.print(" mG ");
-        Serial.print("Z-mag field: "); Serial.print(myIMU.mz);
-        Serial.println(" mG");
+        Serial.print(" Z-mag field: "); Serial.print(myIMU.mz);
+        Serial.print(" mG");
 
-        datalog.print("X-mag field: "); datalog.print(myIMU.mx);
+        datalog.print(" X-mag field: "); datalog.print(myIMU.mx);
         datalog.print(" mG ");
-        datalog.print("Y-mag field: "); datalog.print(myIMU.my);
+        datalog.print(" Y-mag field: "); datalog.print(myIMU.my);
         datalog.print(" mG ");
-        datalog.print("Z-mag field: "); datalog.print(myIMU.mz);
-        datalog.println(" mG");
+        datalog.print(" Z-mag field: "); datalog.print(myIMU.mz);
+        datalog.print(" mG");
 
         myIMU.tempCount = myIMU.readTempData();  // Read the adc values
         // Temperature in degrees Centigrade
         myIMU.temperature = ((float) myIMU.tempCount) / 333.87 + 21.0;
         // Print temperature in degrees Centigrade
-        Serial.print("Temperature is ");  Serial.print(myIMU.temperature, 1);
+        Serial.print("Temperature: ");  Serial.print(myIMU.temperature, 1);
         Serial.println(" degrees C");
 
-        datalog.print("Temperature is ");  datalog.print(myIMU.temperature, 1);
+        datalog.print("Temperature: ");  datalog.print(myIMU.temperature, 1);
         datalog.println(" degrees C");
       }
 
       myIMU.count = millis();
-      digitalWrite(myLed, !digitalRead(myLed));  // toggle led
+     
     } // if (myIMU.delt_t > 500)
   } // if (!AHRS)
   else
