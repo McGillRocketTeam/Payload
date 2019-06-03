@@ -14,7 +14,7 @@ Intersema::BaroPressure_MS5607B baro(true);    //The file named IntersemaBaro.h 
 int status;
 int vacuumPump1 = 1;        // set to the digital pin that pumps are connected to
 int valve = 2;            // set to the digital pin that the valve is connected to
-int buzzer = 3;
+int buzzer = 3;           //set to the digital pin tht the buzzer is connected to
 
 File datalog;
 const int num_meas = 50;
@@ -24,8 +24,8 @@ float ground_alt = 0;
 float T; // sampling period, time of each loop
 float t_previous_loop;
 float average_gradient;
-float threshold_altitude = 28000 ;
-float  lower_threshold = 1800;
+float threshold_altitude = 28000 ;        //threshold for apogee
+float  lower_threshold = 1800;            //min samplling height
 bool apogee_reached = false;
 
                               //SCL is pin 19 and SDL is pin 18
@@ -70,16 +70,16 @@ if (!SD.begin(chipSelect)) {
 
   }
   for (int i = 0; i < 500; i++){
-    ground_alt += (baro.getHeightCentiMeters()/30.48); //reads alt 500 times
+    ground_alt += (baro.getHeightCentiMeters()/30.48);            //reads alt 500 times
   }
-  ground_alt = ground_alt/500; //average of alt readings
+  ground_alt = ground_alt/500;                                    //average of alt readings
   
 
   for (int j = 0; j < 2048 * 3; j++ ) 
   {
    // 1 / 2048Hz = 488uS, or 244uS high and 244uS low to create 50% duty cycle
    digitalWrite(buzzer, HIGH);
-   delayMicroseconds(244);
+   delayMicroseconds(244);                                        //produces 2048Hz for 3 seconds
    digitalWrite(buzzer, LOW);
    delayMicroseconds(244);
    } 
@@ -119,7 +119,7 @@ void loop() {
       }
        if ((alt_meas > threshold_altitude) && (apogee_reached == false)){
         
-        if (average_gradient < -1.0){ 
+        if (average_gradient < -1.0){                       //has to be above the set height and falling
           apogee_reached = true;
         }
        }
@@ -129,7 +129,7 @@ void loop() {
 
   // display the data
   Serial.print("Time: ");
-  Serial.print(time);           //recording data in serial monitor
+  Serial.print(time);                       //recording data in serial monitor
   Serial.print("\t");
   Serial.print(", Feet: ");
   Serial.print(feet, 2);
@@ -145,16 +145,14 @@ void loop() {
   Serial.print("\t");
   
 
-  datalog.print("Time: ");
-  datalog.print(time);        //recording data in SD card
+  datalog.print("Time: ");    
+  datalog.print(time);                  //recording data in SD card
   datalog.print("\t");
   datalog.print(", Feet: ");
   datalog.print(feet, 2);
   datalog.print("\t");
   datalog.print(" Meters: ");
   datalog.print(meters, 2);
-  datalog.print("\t");
-  datalog.print("Height Differential:");
   datalog.print("\t");
   datalog.print("Height Differential:");
   datalog.println(alt_meas);
@@ -246,12 +244,11 @@ void loop() {
       Serial.print("\t");
       Serial.print("Lower Threshold Reached");
       datalog.print("\t");
-      datalog.print("\t");
       datalog.println("Lower Threshold Reached");
       
     }
     
-  datalog.flush();
+   datalog.flush();
   datalog.close();
     digitalWrite(ledPin, HIGH);
   delay(200);
