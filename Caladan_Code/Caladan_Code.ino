@@ -42,7 +42,6 @@ const int chipSelect = BUILTIN_SDCARD;                   //initialization for SD
 void setup() {
 
 Serial.begin(115200);
-//while(!Serial);
 delay(500);
 Serial.println("Sensor suite test");
  Wire.begin();
@@ -227,22 +226,23 @@ void loop() {
   
    
     if (apogee_reached == true ){
-     digitalWrite(valve, HIGH);         //opens valve
-    digitalWrite(vacuumPump1, HIGH);     //turns on pumps
-    Serial.print("\t");
-    Serial.print("\t");
-    Serial.println("Apogee Reached");
-    datalog.print("\t");
-    datalog.print("\t");
-    datalog.println("Apogee Reached");
+      digitalWrite(valve, HIGH);         //opens valve
+      digitalWrite(vacuumPump1, HIGH);     //turns on pumps
+      Serial.print("\t");
+      Serial.print("\t");
+      Serial.println("Apogee Reached");
+      datalog.print("\t");
+      datalog.print("\t");
+      datalog.println("Apogee Reached");
     
     }
     if (alt_meas <= lower_threshold){
-       digitalWrite(vacuumPump1, LOW);        //turns off pumps
+      digitalWrite(vacuumPump1, LOW);        //turns off pumps
       digitalWrite(valve, LOW);       //closes valve
       Serial.print("\t");
       Serial.print("\t");
       Serial.print("Lower Threshold Reached");
+      datalog.print("\t");
       datalog.print("\t");
       datalog.println("Lower Threshold Reached");
       
