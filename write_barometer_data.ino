@@ -8,10 +8,9 @@ FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
 
 CAN_message_t msg;
 
-// In a union, all members share the same memory location. So if a float is stored in f, and the 
-// value of the array called 'bytes' is examined, each element of the array will contain one of 
+// In a union, all members share the same memory location. So if a float is stored in 'f', and the 
+// value of the array called 'bytes' is examined, each element of the array will contain one of the
 // bytes of the 32 bit number encoding the float. 
-
 union my_float {
   float f;
   uint8_t bytes[4];
