@@ -53,14 +53,14 @@ void setup() {
 
 void collectAnalog (int count){
   //Serial.println("Foo Called");
-  analogReadResolution(18);  
+  analogReadResolution(10);  
   
  // Read count 
   vRealX[count] = analogRead(A0);
   String xTimeStamp = String(millis());
   vRealY[count] = analogRead(A1);
   String yTimeStamp = String(millis());
-  vRealX[count] = analogRead(A2);
+  vRealZ[count] = analogRead(A3);
   String zTimeStamp = String(millis());
 
   // collecting data in csv file 
@@ -72,21 +72,41 @@ void collectAnalog (int count){
 
 }
 
-double calcFFT(double vReal[],double vImag[], uint16_t samples){
+double findMaxInArr(double arr[]){
+    double m = 0; 
+    for (int i = 0; i< samples; i++){
+        if (arr[i]>m){
+          m = arr[i]; 
+        }
+    } 
+
+    return m; 
+}
+
+String calcFFT(double vReal[],double vImag[], uint16_t samples){
       FFT.Windowing(vReal, samples, FFT_WIN_TYP_HAMMING, FFT_FORWARD);  /* Weigh data */
       FFT.Compute(vReal, vImag, samples, FFT_FORWARD); /* Compute FFT */
       FFT.ComplexToMagnitude(vReal, vImag, samples); /* Compute magnitudes */
       double x; 
       double v;
-      return FFT.MajorPeak(vReal, samples, samplingFrequency);  
+      v = findMaxInArr(vReal)/100000;
+      x = FFT.MajorPeak(vReal, samples, samplingFrequency);
+//      Serial.print(x, 6);
+//      Serial.print("Hz, ");
+//      Serial.println(v, 6);
+      return String(x)+"Hz,"+ String(v)+"V";  
 }
 
 
 int counter = 0; 
 int t = millis();
 int periodLength = 397; 
+int maxCount = 250000;
+int counter2 = 0;
 // the loop runs when the data is 
 void loop() {
+
+  if (counter2<maxCount){
 
   // collecting analog data until frequency is achieved 
   int beforeExec = micros();
@@ -102,10 +122,11 @@ void loop() {
     //int t1 = micros();
     
      
-     double frqX = calcFFT(vRealX, vImagX, samples);
-     double frqY = calcFFT(vRealY, vImagY, samples);
-     double frqZ = calcFFT(vRealZ, vImagZ, samples);
-
+     String frqX = calcFFT(vRealX, vImagX, samples);
+     String frqY = calcFFT(vRealY, vImagY, samples);
+     String frqZ = calcFFT(vRealZ, vImagZ, samples);
+//    PrintVector(vRealX, (samples >> 1), SCL_FREQUENCY);
+    Serial.println(String(frqX) + "," + String(frqY) + "," + String(frqZ));
 
     Serial.println(millis()-t);
     t=millis();
@@ -114,6 +135,10 @@ void loop() {
      counter=0;
    
       
-    }
- 
+    } 
+  }else{
+    
+   dataCollection.close(); 
+   }
+   counter2++;
   }
