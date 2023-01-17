@@ -121,10 +121,11 @@ void loop() {
     if (counter == samples){
     //int t1 = micros();
     
-     
+    // GENERATING FREQUENCIES 
      String frqX = calcFFT(vRealX, vImagX, samples);
      String frqY = calcFFT(vRealY, vImagY, samples);
      String frqZ = calcFFT(vRealZ, vImagZ, samples);
+
 //    PrintVector(vRealX, (samples >> 1), SCL_FREQUENCY);
     Serial.println(String(frqX) + "," + String(frqY) + "," + String(frqZ));
 
