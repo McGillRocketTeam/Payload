@@ -1,7 +1,6 @@
 #include <arduinoFFT.h>
 #include <SD.h>
 
-
 arduinoFFT FFT = arduinoFFT(); // CREATE FFT object
 
 const uint16_t samples = 2048; //This value MUST ALWAYS be a power of 2
@@ -72,7 +71,7 @@ void collectAnalog (int count){
 
 }
 
-double findMaxInArr(double arr[]){
+float findMaxInArr(double arr[]){
     double m = 0; 
     for (int i = 0; i< samples; i++){
         if (arr[i]>m){
@@ -83,18 +82,13 @@ double findMaxInArr(double arr[]){
     return m; 
 }
 
-String calcFFT(double vReal[],double vImag[], uint16_t samples){
+float calcFFT(double vReal[],double vImag[], uint16_t samples){
       FFT.Windowing(vReal, samples, FFT_WIN_TYP_HAMMING, FFT_FORWARD);  /* Weigh data */
       FFT.Compute(vReal, vImag, samples, FFT_FORWARD); /* Compute FFT */
       FFT.ComplexToMagnitude(vReal, vImag, samples); /* Compute magnitudes */
-      double x; 
-      double v;
-      v = findMaxInArr(vReal)/100000;
+      float x; 
       x = FFT.MajorPeak(vReal, samples, samplingFrequency);
-//      Serial.print(x, 6);
-//      Serial.print("Hz, ");
-//      Serial.println(v, 6);
-      return String(x)+"Hz,"+ String(v)+"V";  
+      return x; 
 }
 
 
@@ -104,9 +98,14 @@ int periodLength = 397;
 int maxCount = 250000;
 int counter2 = 0;
 // the loop runs when the data is 
+
+// TODO : Acknowledge from CAN bus to modify the the following values.
+bool isSampling = false; 
+bool isScrubReset = false; // Value to be added in code
+bool isShutDown = false; 
 void loop() {
 
-  if (counter2<maxCount){
+  if (isSampling && !isScrubReset && !isShutDown){
 
   // collecting analog data until frequency is achieved 
   int beforeExec = micros();
@@ -122,23 +121,34 @@ void loop() {
     //int t1 = micros();
     
      
-     String frqX = calcFFT(vRealX, vImagX, samples);
-     String frqY = calcFFT(vRealY, vImagY, samples);
-     String frqZ = calcFFT(vRealZ, vImagZ, samples);
-//    PrintVector(vRealX, (samples >> 1), SCL_FREQUENCY);
-    Serial.println(String(frqX) + "," + String(frqY) + "," + String(frqZ));
+     float frqX = calcFFT(vRealX, vImagX, samples);
+     float ampX = findMaxInArr(vRealX)/100000;
+     float frqY = calcFFT(vRealY, vImagY, samples);
+     float ampY = findMaxInArr(vRealY)/100000;
+     float frqZ = calcFFT(vRealZ, vImagZ, samples);
+     float ampZ = findMaxInArr(vRealZ)/100000;
+
+    // PRINT OUTPUT : Serial.println(String(frqX) + "," + String(frqY) + "," + String(frqZ));
 
     Serial.println(millis()-t);
     t=millis();
-     //TODO : send frequencies through CAN bus (frqX, frqY, frqZ)
+    
+    //TODO : send frequencies through CAN bus (frqX, frqY, frqZ)
      
      counter=0;
    
       
     } 
   }else{
-    
-   dataCollection.close(); 
+    if (isShutDown){
+       dataCollection.close(); 
+      }
+     if(isScrubReset){
+      dataCollection.close();
+      SD.remove("dataCollection.csv");
+      dataCollection = SD.open("dataCollection.csv", FILE_WRITE | FILE_READ);
+      isScrubReset = false; 
+     }
    }
    counter2++;
   }
