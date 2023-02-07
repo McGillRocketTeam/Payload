@@ -1,5 +1,34 @@
 #include <math.h>
 
+FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
+CAN_message_t msg;
+
+/* Structure containing all the data needing to be send*/
+struct Data {
+  float frqX;
+  float frqY;
+  float frqZ; 
+  
+  float ampX;
+  float ampY;
+  float ampZ;
+  
+  int minutes;
+  int seconds;
+  int milliseconds;
+};
+
+/** 
+ *  Trick to split the int into bytes
+ *  In a union, all members share the same memory location. So if a float is stored in 'f', and the 
+ *  value of the array called 'bytes' is examined, each element of the array will contain one of the
+ *  bytes of the 32 bit number encoding the float. 
+ */
+union my_msg {
+  uint32_t msg;
+  uint8_t bytes[4];
+};
+
 /**
  * Given 3 frequency values, concatenates and stores them into a 32 bit unsigned int. 
  * Only the least significant 30 of the 32 bits are used
@@ -104,4 +133,3 @@ void sendMsg(union my_msg *uMsg1, union my_msg *uMsg2, union my_msg *uMsg3){
   }
   can1.write(msg); //todo test
 }
-
