@@ -1,3 +1,4 @@
+#include <math.h>
 
 /**
  * Given 3 frequency values, concatenates and stores them into a 32 bit unsigned int. 
