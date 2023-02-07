@@ -1,5 +1,11 @@
 #include <arduinoFFT.h>
 #include <SD.h>
+#include <FlexCAN_T4.h>
+
+#include "send.h"
+
+FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
+CAN_message_t msg;
 
 arduinoFFT FFT = arduinoFFT(); // CREATE FFT object
 
@@ -36,6 +42,10 @@ File dataCollection;
 // the setup routine runs once when you press reset:
 void setup()
 {
+
+  can1.begin();
+  can1.setBaudRate(250000); //todo check baudrate
+  
   // initialize the digital pin as an output.
   pinMode(led, OUTPUT);
   Serial.begin(9600);
@@ -110,6 +120,32 @@ bool isSampling = false;
 bool isScrubReset = false; // Value to be added in code
 bool isShutDown = false;
 
+// Structure containing all the data needing to be send
+struct Data {
+  float frqX;
+  float frqY;
+  float frqZ; 
+  
+  float ampX;
+  float ampY;
+  float ampZ;
+  
+  int minutes;
+  int seconds;
+  int milliseconds;
+};
+
+/** 
+ *  Trick to split the int into bytes
+ *  In a union, all members share the same memory location. So if a float is stored in 'f', and the 
+ *  value of the array called 'bytes' is examined, each element of the array will contain one of the
+ *  bytes of the 32 bit number encoding the float. 
+ */
+union my_msg {
+  uint32_t msg;
+  uint8_t bytes[4];
+};
+
 /**
  * this is the main sampling loop.
  * the loop is constatnly sampling unless the controls above are false.
@@ -154,8 +190,19 @@ void loop()
       Serial.println(millis() - t);
       t = millis();
 
-      // TODO : send frequencies through CAN bus (frqX, frqY, frqZ)
+      /* Sending data on CANBus*/
 
+      // Initialize the structure with relevant data
+      struct Data dt = {frqX, frqY, frqZ, ampX, ampY, ampZ, 10, 11, 12}; //todo get time
+
+      // Declare 3 unions which will contain the messages to be sent
+      union my_msg m1;
+      union my_msg m2;
+      union my_msg m3;
+      
+      buildMsg(&m1, &m2, &m3, dt); // Concatenate the data and format it to be sent in 10 bytes
+      sendMsg(&m1, &m2, &m3); // Send the messages
+      
       counter = 0;
     }
   }
