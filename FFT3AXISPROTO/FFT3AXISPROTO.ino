@@ -4,9 +4,6 @@
 
 #include "send.h"
 
-FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
-CAN_message_t msg;
-
 arduinoFFT FFT = arduinoFFT(); // CREATE FFT object
 
 const uint16_t samples = 2048; // This value MUST ALWAYS be a power of 2
@@ -42,7 +39,6 @@ File dataCollection;
 // the setup routine runs once when you press reset:
 void setup()
 {
-
   can1.begin();
   can1.setBaudRate(250000); //todo check baudrate
   
@@ -119,32 +115,6 @@ int counter2 = 0;
 bool isSampling = false;
 bool isScrubReset = false; // Value to be added in code
 bool isShutDown = false;
-
-// Structure containing all the data needing to be send
-struct Data {
-  float frqX;
-  float frqY;
-  float frqZ; 
-  
-  float ampX;
-  float ampY;
-  float ampZ;
-  
-  int minutes;
-  int seconds;
-  int milliseconds;
-};
-
-/** 
- *  Trick to split the int into bytes
- *  In a union, all members share the same memory location. So if a float is stored in 'f', and the 
- *  value of the array called 'bytes' is examined, each element of the array will contain one of the
- *  bytes of the 32 bit number encoding the float. 
- */
-union my_msg {
-  uint32_t msg;
-  uint8_t bytes[4];
-};
 
 /**
  * this is the main sampling loop.
