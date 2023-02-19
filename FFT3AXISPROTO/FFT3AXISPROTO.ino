@@ -28,34 +28,32 @@ double vRealZ[samples];
 double vImagZ[samples];
 int led = 13;
 
-File fileX;
-File fileY;
-File fileZ;
 File dataCollection;
-
+File fftData; 
 // the setup routine runs once when you press reset:
 void setup()
 {
   // initialize the digital pin as an output.
   pinMode(led, OUTPUT);
   Serial.begin(9600);
-  while (!Serial)
-    ;
+  while (!Serial);
   Serial.println("READY");
   Serial.begin(9600);
 
-  while (!SD.begin(BUILTIN_SDCARD))
-    ;
+  while (!SD.begin(BUILTIN_SDCARD));
   Serial.println("SD Card initialized");
 
   // delete file if previously initialized
   SD.remove("dataCollection.csv");
+  SD.remove("fftData.csv");
   dataCollection = SD.open("dataCollection.csv", FILE_WRITE | FILE_READ);
+  fftData = SD.open("fftData.csv", FILE_WRITE | FILE_READ);
+  dataCollection.println("time,amplitude X (1023),amplitude Y (1023), amplitude Z");
+ // fftData.println("time, frqX, frqY, frqZ, ampX, ampY, ampZ");
 }
 
 void collectAnalog(int count)
 {
-  // Serial.println("Foo Called");
   analogReadResolution(10);
 
   // Read count
@@ -68,7 +66,9 @@ void collectAnalog(int count)
 
   // collecting data in csv file
 
-  dataCollection.println(xTimeStamp + "," + yTimeStamp + "," + zTimeStamp + "," + vRealX[count] + "," + vRealY[count] + "," + vRealZ[count]);
+  dataCollection.println(xTimeStamp + "," + vRealX[count] + "," + vRealY[count] + "," + vRealZ[count]);
+  
+  Serial.println(dataCollection.size());
   vImagX[count] = 0;
   vImagY[count] = 0;
   vImagZ[count] = 0;
@@ -100,13 +100,13 @@ float calcFFT(double vReal[], double vImag[], uint16_t samples)
 
 int counter = 0;
 int t = millis();
-int periodLength = 397;
+int periodLength = 393;
 int maxCount = 250000;
 int counter2 = 0;
 // the loop runs when the data is
 
 // TODO : Acknowledge from CAN bus to modify the the following values.
-bool isSampling = false;
+bool isSampling = true;
 bool isScrubReset = false; // Value to be added in code
 bool isShutDown = false;
 
@@ -124,7 +124,7 @@ void loop()
 {
 
   // TODO: POSSIBLE CAN bus acknowledgement of signals point.
-  if (isSampling && !isScrubReset && !isShutDown)
+  if (isSampling && !isScrubReset && !isShutDown && counter2<maxCount)
   {
 
     // collecting analog data until frequency is achieved
@@ -148,7 +148,9 @@ void loop()
       float ampY = findMaxInArr(vRealY) / 100000;
       float frqZ = calcFFT(vRealZ, vImagZ, samples);
       float ampZ = findMaxInArr(vRealZ) / 100000;
+      int tS = millis(); 
 
+       dataCollection.println(",,,,"+String(tS) + "," + String(frqX) + "," + String(frqY) + "," + String(frqZ) + "," + String(ampX) +"," + String(ampY) + "," + String(ampZ));
       // PRINT OUTPUT : Serial.println(String(frqX) + "," + String(frqY) + "," + String(frqZ));
 
       Serial.println(millis() - t);
@@ -161,9 +163,14 @@ void loop()
   }
   else
   {
+ 
+       dataCollection.close();
+    //  fftData.close();
+      Serial.println(millis());
     if (isShutDown)
     {
       dataCollection.close();
+      fftData.close();
     }
     if (isScrubReset)
     {
