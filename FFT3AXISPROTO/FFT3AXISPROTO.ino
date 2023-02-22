@@ -40,6 +40,7 @@ void setup()
   Serial.println("READY");
   Serial.begin(9600);
 
+  // Sd card connection 
   while (!SD.begin(BUILTIN_SDCARD));
   Serial.println("SD Card initialized");
 
@@ -47,6 +48,8 @@ void setup()
   SD.remove("dataCollection.csv");
   SD.remove("fftData.csv");
   dataCollection = SD.open("dataCollection.csv", FILE_WRITE | FILE_READ);
+  
+  // from the test on saturday writing to two files was expensive, but feel free to try again. 
   fftData = SD.open("fftData.csv", FILE_WRITE | FILE_READ);
   dataCollection.println("time,amplitude X (1023),amplitude Y (1023), amplitude Z");
  // fftData.println("time, frqX, frqY, frqZ, ampX, ampY, ampZ");
@@ -57,11 +60,11 @@ void collectAnalog(int count)
   analogReadResolution(10);
 
   // Read count
-  vRealX[count] = analogRead(A0);
+  vRealX[count] = analogRead(A10);
   String xTimeStamp = String(millis());
-  vRealY[count] = analogRead(A1);
+  vRealY[count] = analogRead(A11);
   String yTimeStamp = String(millis());
-  vRealZ[count] = analogRead(A3);
+  vRealZ[count] = analogRead(A12);
   String zTimeStamp = String(millis());
 
   // collecting data in csv file
@@ -74,6 +77,7 @@ void collectAnalog(int count)
   vImagZ[count] = 0;
 }
 
+// finding amplitude of major peak . 
 float findMaxInArr(double arr[])
 {
   double m = 0;
@@ -88,6 +92,7 @@ float findMaxInArr(double arr[])
   return m;
 }
 
+// fft calculation of frequency of the Major Peak. 
 float calcFFT(double vReal[], double vImag[], uint16_t samples)
 {
   FFT.Windowing(vReal, samples, FFT_WIN_TYP_HAMMING, FFT_FORWARD); /* Weigh data */
@@ -100,7 +105,8 @@ float calcFFT(double vReal[], double vImag[], uint16_t samples)
 
 int counter = 0;
 int t = millis();
-int periodLength = 393;
+// period of latency in microseconds between each data sample. 
+int periodLength = 397;
 int maxCount = 250000;
 int counter2 = 0;
 // the loop runs when the data is
@@ -128,11 +134,16 @@ void loop()
   {
 
     // collecting analog data until frequency is achieved
+    
+    
     int beforeExec = micros();
+    // collecting analog data
     collectAnalog(counter);
+    // subtracting the time it takes to run "collectAnalog" from the period length to achieve exactly a "periodLength" delay (see definition above)
     int leftOverDelay = periodLength - (micros() - beforeExec);
     if (leftOverDelay > 0)
     {
+      // delay by the amount of time left to add up the total time waited to "periodLength" in Microseconds delayMicroseconds is a built-in function.
       delayMicroseconds(leftOverDelay);
     }
 
@@ -142,6 +153,7 @@ void loop()
     {
       // int t1 = micros();
 
+      // collecting amplitude and frequency data from FFT.
       float frqX = calcFFT(vRealX, vImagX, samples);
       float ampX = findMaxInArr(vRealX) / 100000;
       float frqY = calcFFT(vRealY, vImagY, samples);
@@ -151,7 +163,9 @@ void loop()
       int tS = millis(); 
 
        dataCollection.println(",,,,"+String(tS) + "," + String(frqX) + "," + String(frqY) + "," + String(frqZ) + "," + String(ampX) +"," + String(ampY) + "," + String(ampZ));
-      // PRINT OUTPUT : Serial.println(String(frqX) + "," + String(frqY) + "," + String(frqZ));
+      // DATA PRINTOUT TO MONITOR:  
+      // Serial.println("frqX: " + String(frqX) + "Hz, frqY: " + String(frqY) + "Hz, frqZ: " + String(frqZ) +"Hz, ampX: " + String(ampX) +"Hz, ampY: " + String(ampY) + "Hz, ampZ: " + String(ampZ));
+
 
       Serial.println(millis() - t);
       t = millis();
