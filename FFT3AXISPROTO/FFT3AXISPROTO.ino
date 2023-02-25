@@ -27,7 +27,7 @@ double vImagY[samples];
 double vRealZ[samples];
 double vImagZ[samples];
 int led = 13;
-
+int blinkState = 0;
 File dataCollection;
 File fftData; 
 // the setup routine runs once when you press reset:
@@ -36,7 +36,7 @@ void setup()
   // initialize the digital pin as an output.
   pinMode(led, OUTPUT);
   Serial.begin(9600);
-  while (!Serial);
+  //while (!Serial);
   Serial.println("READY");
   Serial.begin(9600);
 
@@ -50,7 +50,7 @@ void setup()
   dataCollection = SD.open("dataCollection.csv", FILE_WRITE | FILE_READ);
   
   // from the test on saturday writing to two files was expensive, but feel free to try again. 
-  fftData = SD.open("fftData.csv", FILE_WRITE | FILE_READ);
+  //fftData = SD.open("fftData.csv", FILE_WRITE | FILE_READ);
   dataCollection.println("time,amplitude X (1023),amplitude Y (1023), amplitude Z");
  // fftData.println("time, frqX, frqY, frqZ, ampX, ampY, ampZ");
 }
@@ -71,7 +71,8 @@ void collectAnalog(int count)
 
   dataCollection.println(xTimeStamp + "," + vRealX[count] + "," + vRealY[count] + "," + vRealZ[count]);
   
-  Serial.println(dataCollection.size());
+  //Serial.println(dataCollection.size());
+  Serial.println(xTimeStamp + "," + vRealX[count] + "," + vRealY[count] + "," + vRealZ[count]);
   vImagX[count] = 0;
   vImagY[count] = 0;
   vImagZ[count] = 0;
@@ -104,17 +105,20 @@ float calcFFT(double vReal[], double vImag[], uint16_t samples)
 }
 
 int counter = 0;
-int t = millis();
+unsigned long t = millis();
 // period of latency in microseconds between each data sample. 
 int periodLength = 397;
-int maxCount = 250000;
-int counter2 = 0;
+unsigned long waitTime = 20000;
+unsigned long maxTime = 600000;
+unsigned long t_wait = millis() + waitTime;
+unsigned long t_max = millis() + maxTime + waitTime;
 // the loop runs when the data is
 
 // TODO : Acknowledge from CAN bus to modify the the following values.
 bool isSampling = true;
 bool isScrubReset = false; // Value to be added in code
 bool isShutDown = false;
+bool initialWait = true;
 
 /**
  * this is the main sampling loop.
@@ -130,7 +134,7 @@ void loop()
 {
 
   // TODO: POSSIBLE CAN bus acknowledgement of signals point.
-  if (isSampling && !isScrubReset && !isShutDown && counter2<maxCount)
+  if (isSampling && !isScrubReset && !isShutDown && t < t_max && !initialWait)
   {
 
     // collecting analog data until frequency is achieved
@@ -164,7 +168,7 @@ void loop()
 
        dataCollection.println(",,,,"+String(tS) + "," + String(frqX) + "," + String(frqY) + "," + String(frqZ) + "," + String(ampX) +"," + String(ampY) + "," + String(ampZ));
       // DATA PRINTOUT TO MONITOR:  
-      // Serial.println("frqX: " + String(frqX) + "Hz, frqY: " + String(frqY) + "Hz, frqZ: " + String(frqZ) +"Hz, ampX: " + String(ampX) +"Hz, ampY: " + String(ampY) + "Hz, ampZ: " + String(ampZ));
+       Serial.println("frqX: " + String(frqX) + "Hz, frqY: " + String(frqY) + "Hz, frqZ: " + String(frqZ) +"Hz, ampX: " + String(ampX) +"Hz, ampY: " + String(ampY) + "Hz, ampZ: " + String(ampZ));
 
 
       Serial.println(millis() - t);
@@ -173,14 +177,40 @@ void loop()
       // TODO : send frequencies through CAN bus (frqX, frqY, frqZ)
 
       counter = 0;
+      //STOP
+      //isSampling = false;
+      //Serial.println("STOP");
+      if (blinkState == 0){
+        digitalWrite(led, HIGH);
+        blinkState = 1;
+      }
+      else{
+        digitalWrite(led, LOW);
+        blinkState = 0;
+      }
     }
+  }
+  else if (initialWait) {
+    digitalWrite(led, HIGH);
+    delay(100);
+    digitalWrite(led, LOW);
+    delay(5000);
+    t = millis();
+    if(t > t_wait){
+      initialWait = false;
+    }
+    
   }
   else
   {
+    digitalWrite(led, HIGH);
+    delay(100);
+    digitalWrite(led, LOW);
+    delay(100);
  
        dataCollection.close();
-    //  fftData.close();
-      Serial.println(millis());
+    // fftData.close();
+    // Serial.println(millis());
     if (isShutDown)
     {
       dataCollection.close();
@@ -194,5 +224,5 @@ void loop()
       isScrubReset = false;
     }
   }
-  counter2++;
+  
 }
