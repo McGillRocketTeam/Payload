@@ -2,6 +2,7 @@
 
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
 CAN_message_t msg;
+CAN_message_t msg2;
 
 /* Structure containing all the data needing to be send*/
 struct Data {
@@ -37,16 +38,24 @@ union my_msg {
  *   Most significant 10 bits encode the frqX, 
  *   then the next 10 encode frqY,
  *   the least significant 10 are for frqZ
+ *   ie. xxxxxxxxxxyyyyyyyyyyzzzzzzzzzz
+ *
+ * The frequencies should only go up to 1000 Hz but if ever there is 
+ * an overflow, it is indicated by all 1's. 
  */
 uint32_t formatFrq(float frqX, float frqY, float frqZ) {
   uint32_t formattedFrqs;
   // round the frequencies to the nearest unit before shifting
   int roundedFrqX = lroundf(frqX);
+  if (frqX > 1000) roundedFrqX = 1023; //use 1111111111 to indicate overflow
+
   int roundedFrqY = lroundf(frqY);
+  if (frqY > 1000) roundedFrqY = 1023;
+
   int roundedFrqZ = lroundf(frqZ);
-  
+  if (frqZ > 1000) roundedFrqZ = 1023;
+
   formattedFrqs = (roundedFrqZ & 1023) | ((roundedFrqY & 1023) << 10) | ((roundedFrqX & 1023) << 20); // 1023 is 0b1111111111.
-  
   return formattedFrqs;
 }
 
@@ -62,12 +71,16 @@ uint32_t formatFrq(float frqX, float frqY, float frqZ) {
 uint32_t formatAmp(float ampX, float ampY, float ampZ){
   uint32_t formattedAmps;
   //multiply the amplitudes by 100 such that 2 decimals of precision can be kept. Then round to the nearest unit
-  int roundedAmpX = lroundf(ampX*100);
-  int roundedAmpY = lroundf(ampY*100);
-  int roundedAmpZ = lroundf(ampZ*100);
-  
-  formattedAmps = (roundedAmpZ & 511) | ((roundedAmpY & 511) << 9) | ((roundedAmpX & 511) << 18); // 511 is 0b111111111. 
-  
+  int roundedAmpX = lroundf(ampX * 100);
+  if (ampX > 3.3) roundedAmpX = 511; //use 11111111 to indicate overflow
+
+  int roundedAmpY = lroundf(ampY * 100);
+  if (ampY > 3.3) roundedAmpY = 511;
+
+  int roundedAmpZ = lroundf(ampZ * 100);
+  if (ampZ > 3.3) roundedAmpZ = 511;
+
+  formattedAmps = (roundedAmpZ & 511) | ((roundedAmpY & 511) << 9) | ((roundedAmpX & 511) << 18); // 511 is 0b111111111. Most significant 9 bits encode the ampX, then the next 9 encode ampY,the leas significant 9 are for ampZ
   return formattedAmps;
 }
 
@@ -92,6 +105,9 @@ uint32_t formatTime(int minutes, int seconds, int milliseconds){
  *    msg1(32 bits): Lower 2 bits of amp + all 30 bits of frq
  *    msg2 (32 bits): Lower 7 bits oftime + upper 25 bits of amp
  *    msg3(16 bits): 1 bit payload sampling + upper 15 bits of time
+ * ie. msg1: AAFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF
+ *     msg2: tttttttA AAAAAAAA AAAAAAAA AAAAAAAA
+ *     msg3: sttttttt tttttttt
  *  Finally, store the formatted messages into the my_msg union
  */
 void buildMsg(union my_msg *uMsg1, union my_msg *uMsg2, union my_msg *uMsg3, struct Data dt){
@@ -117,19 +133,50 @@ void buildMsg(union my_msg *uMsg1, union my_msg *uMsg2, union my_msg *uMsg3, str
  */
 void sendMsg(union my_msg *uMsg1, union my_msg *uMsg2, union my_msg *uMsg3){
   can1.events();
-  
+
   msg.id = 0x300;
   for ( uint8_t i = 0; i < 4; i++ ) {
-      msg.buf[i] = uMsg1->bytes[i]; 
+    msg.buf[i] = uMsg1->bytes[i];
   }
   for ( uint8_t i = 0; i < 4; i++ ) {
-      msg.buf[i] = uMsg2->bytes[i];
+    msg.buf[i + 4] = uMsg2->bytes[i];
   }
-  can1.write(msg); //todo test
-  
-  msg.id = 0x301;
+  can1.write(msg);
+
+  msg2.id = 0x301;
   for ( uint8_t i = 0; i < 2; i++ ) {
-      msg.buf[i] = uMsg3->bytes[i];
+    msg2.buf[i] = uMsg3->bytes[i];
   }
-  can1.write(msg); //todo test
+  can1.write(msg2);
+}
+
+// Function to transform the data received on the bus back to frequency, amplitude and time 
+struct Data decode(uint8_t buf1[], uint8_t buf2[]) {
+  union my_msg uMsg1;
+  union my_msg uMsg2;
+  union my_msg uMsg3;
+
+  for ( uint8_t i = 0; i < 4; i++ ) {
+    uMsg1.bytes[i] = buf1[i];
+    uMsg2.bytes[i] = buf1[i + 4];
+  }
+
+  for ( uint8_t i = 0; i < 2; i++ ) {
+    uMsg3.bytes[i] = buf2[i];
+  }
+
+  int frqX = (uMsg1.msg) >> 20 & 1023;
+  int frqY = (uMsg1.msg) >> 10 & 1023;
+  int frqZ = (uMsg1.msg) & 1023;
+
+  float ampX = (((uMsg2.msg) >> 16 & 511)) / 100.0;
+  float ampY = (((uMsg2.msg) >> 7 & 511)) / 100.0;
+  float ampZ = ((((uMsg2.msg) & 127) << 2 | ((uMsg1.msg) >> 30) & 3)) / 100.0;
+
+  int milliseconds = ((uMsg3.msg) & 7) << 7 | (((uMsg2.msg) >> 25) & 127) ;
+  int seconds = ((uMsg3.msg) >> 3 & 63);
+  int minutes = ((uMsg3.msg) >> 9 & 63);
+  struct Data dt = {frqX, frqY, frqZ, ampX, ampY, ampZ, minutes, seconds, milliseconds};
+
+  return dt;
 }
