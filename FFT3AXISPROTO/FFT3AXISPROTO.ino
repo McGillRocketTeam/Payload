@@ -39,8 +39,18 @@ File dataCollection;
 // the setup routine runs once when you press reset:
 void setup()
 {
+  //Setting up CAN Bus
   can1.begin();
   can1.setBaudRate(250000); //todo check baudrate
+  can1.setMaxMB(16);
+  can1.enableFIFO();
+  can1.enableFIFOInterrupt();
+  can1.onReceive(canSniff); // interrupts and goes into the canSniff function when a message is received
+  can1.mailboxStatus();
+  
+  //Setting up filters for CAN bus
+  can1.setFIFOFilter(REJECT_ALL); // Block data before setting filter
+  can1.setFIFOFilter(1, 0x11, STD); // Only receive messages with ID 0x11
   
   // initialize the digital pin as an output.
   pinMode(led, OUTPUT);
@@ -111,10 +121,14 @@ int maxCount = 250000;
 int counter2 = 0;
 // the loop runs when the data is
 
-// TODO : Acknowledge from CAN bus to modify the the following values.
 bool isSampling = false;
 bool isScrubReset = false; // Value to be added in code
 bool isShutDown = false;
+
+// Receive message from FC
+void canSniff(const CAN_message_t &msg) {
+  if (msg.buf[0] == 1) isSampling = true;
+}
 
 /**
  * this is the main sampling loop.
@@ -129,7 +143,6 @@ bool isShutDown = false;
 void loop()
 {
 
-  // TODO: POSSIBLE CAN bus acknowledgement of signals point.
   if (isSampling && !isScrubReset && !isShutDown)
   {
 
