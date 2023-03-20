@@ -1,9 +1,8 @@
 #include <math.h>
 
-FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
+FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16> can2;
 CAN_message_t msg;
 CAN_message_t msg2;
-
 /* Structure containing all the data needing to be send*/
 struct Data {
   float frqX;
@@ -84,6 +83,17 @@ uint32_t formatAmp(float ampX, float ampY, float ampZ){
   return formattedAmps;
 }
 
+int getMinutes(int milliseconds){
+  Serial.println(milliseconds/60000);
+  return (milliseconds/60000);
+}
+int getSeconds(int milliseconds){
+  return (milliseconds/1000) % 60;
+}
+int getMillis(int milliseconds){
+  return (milliseconds)- getMinutes(milliseconds)-getSeconds(milliseconds);
+}
+
 /**
  * Given a time value, concatenates minutes, seconds and milliseconds and stores them into a 32 bit unsigned int. 
  * Only the least significant 22 of the 32 bits are used
@@ -92,6 +102,7 @@ uint32_t formatAmp(float ampX, float ampY, float ampZ){
  *  Most significant 6 bits encode the minutes
  *  then the next 6 encode seconds
  *  the least significant 10 encode milliseconds
+ *  MMMMMM ssssss mmmmmmmmmm
  */
 uint32_t formatTime(int minutes, int seconds, int milliseconds){
   uint32_t formattedTime;
@@ -102,26 +113,24 @@ uint32_t formatTime(int minutes, int seconds, int milliseconds){
 /**
  * Concatenates all the data into 3 messages so they can be sent through can bus.
  * msg structure:
- *    msg1(32 bits): Lower 2 bits of amp + all 30 bits of frq
- *    msg2 (32 bits): Lower 7 bits oftime + upper 25 bits of amp
- *    msg3(16 bits): 1 bit payload sampling + upper 15 bits of time
- * ie. msg1: AAFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF
- *     msg2: tttttttA AAAAAAAA AAAAAAAA AAAAAAAA
- *     msg3: sttttttt tttttttt
+ *     msg1: 00FFFFFF FFFFFFFF FFFFFFFF FFFFFFFF
+ *     msg2: 0000000A AAAAAAAA AAAAAAAA AAAAAAAA
+ *     msg3: 0SMMMMMM ssssssmm mmmmmmmm (where S is payload sampling, M is minute, s is seconds and m is milliseconds)
  *  Finally, store the formatted messages into the my_msg union
  */
 void buildMsg(union my_msg *uMsg1, union my_msg *uMsg2, union my_msg *uMsg3, struct Data dt){
   uint32_t formattedFrq = formatFrq(dt.frqX, dt.frqY, dt.frqZ);
   uint32_t formattedAmp = formatAmp(dt.ampX, dt.ampY, dt.ampZ);
   uint32_t formattedTime = formatTime(dt.minutes, dt.seconds, dt.milliseconds);
-
-  uint32_t msg1 = ((formattedAmp & 3)) << 30 | (formattedFrq); 
-  uint32_t msg2 = ((formattedTime & 127) << 25) | (formattedAmp >> 2); 
-  uint16_t msg3 = (1) << 15 | (formattedTime >> 7);
+ 
+  uint32_t msg1 = (formattedFrq); 
+  uint32_t msg2 = (formattedAmp); 
+  uint32_t msg3 = (1) << 22 | (formattedTime);
 
   uMsg1->msg = msg1;
   uMsg2->msg = msg2;
   uMsg3->msg = msg3;
+
 }
 
 /**
@@ -129,54 +138,55 @@ void buildMsg(union my_msg *uMsg1, union my_msg *uMsg2, union my_msg *uMsg3, str
  * Each CAN transmission can carry 8 bytes of data
  * The first CAN transmission will deliver msg1 and msg2 (all 8 buffers will contain relevant data: 8 bytes) with CANID 0x300
  * The second transmission will deliver msg3 (only buffers 0 and 1 will contain relevant data: 2 bytes) with CANID 0x301
- * 
  */
 void sendMsg(union my_msg *uMsg1, union my_msg *uMsg2, union my_msg *uMsg3){
-  can1.events();
+  can2.events();
 
   msg.id = 0x300;
   for ( uint8_t i = 0; i < 4; i++ ) {
-    msg.buf[i] = uMsg1->bytes[i];
+    msg.buf[3-i] = uMsg1->bytes[i];
   }
   for ( uint8_t i = 0; i < 4; i++ ) {
-    msg.buf[i + 4] = uMsg2->bytes[i];
+    msg.buf[7-i] = uMsg2->bytes[i]; 
   }
-  can1.write(msg);
+  can2.write(msg);
 
   msg2.id = 0x301;
-  for ( uint8_t i = 0; i < 2; i++ ) {
-    msg2.buf[i] = uMsg3->bytes[i];
+  for ( uint8_t i = 0; i < 3; i++ ) {
+    msg2.buf[2-i] = uMsg3->bytes[i];
   }
-  can1.write(msg2);
+  can2.write(msg2);
 }
 
-// Function to transform the data received on the bus back to frequency, amplitude and time 
-struct Data decode(uint8_t buf1[], uint8_t buf2[]) {
-  union my_msg uMsg1;
-  union my_msg uMsg2;
-  union my_msg uMsg3;
-
-  for ( uint8_t i = 0; i < 4; i++ ) {
-    uMsg1.bytes[i] = buf1[i];
-    uMsg2.bytes[i] = buf1[i + 4];
-  }
-
-  for ( uint8_t i = 0; i < 2; i++ ) {
-    uMsg3.bytes[i] = buf2[i];
-  }
-
-  int frqX = (uMsg1.msg) >> 20 & 1023;
-  int frqY = (uMsg1.msg) >> 10 & 1023;
-  int frqZ = (uMsg1.msg) & 1023;
-
-  float ampX = (((uMsg2.msg) >> 16 & 511)) / 100.0;
-  float ampY = (((uMsg2.msg) >> 7 & 511)) / 100.0;
-  float ampZ = ((((uMsg2.msg) & 127) << 2 | ((uMsg1.msg) >> 30) & 3)) / 100.0;
-
-  int milliseconds = ((uMsg3.msg) & 7) << 7 | (((uMsg2.msg) >> 25) & 127) ;
-  int seconds = ((uMsg3.msg) >> 3 & 63);
-  int minutes = ((uMsg3.msg) >> 9 & 63);
-  struct Data dt = {frqX, frqY, frqZ, ampX, ampY, ampZ, minutes, seconds, milliseconds};
-
-  return dt;
-}
+//TODO test this function
+//struct Data decode(uint8_t buf1[], uint8_t buf2[]) {
+//  union my_msg uMsg1;
+//  union my_msg uMsg2;
+//  union my_msg uMsg3;
+//
+//  for ( uint8_t i = 0; i < 4; i++ ) {
+//    uMsg1.bytes[i] = buf1[i];
+//    uMsg2.bytes[i] = buf1[i + 4];
+//  }
+//
+//  for ( uint8_t i = 0; i < 3; i++ ) {
+//    uMsg3.bytes[i] = buf2[i];
+//    Serial.print(uMsg3.bytes[i]);
+//  }
+//
+//  int frqX = (uMsg1.msg) >> 20 & 1023;
+//  int frqY = (uMsg1.msg) >> 10 & 1023;
+//  int frqZ = (uMsg1.msg) & 1023;
+//
+//  float ampX = (((uMsg2.msg) >> 18 & 511)) / 100.0;
+//  float ampY = (((uMsg2.msg) >> 9 & 511)) / 100.0;
+//  float ampZ = ((uMsg2.msg) & 511) / 100.0;
+//
+//  int milliseconds = ((uMsg3.msg) & 1023)  ;
+//  int seconds = ((uMsg3.msg) >> 10 & 63);
+//  int minutes = ((uMsg3.msg) >> 16 & 63);
+//
+//  struct Data dt = {frqX, frqY, frqZ, ampX, ampY, ampZ, minutes, seconds, milliseconds};
+//
+//  return dt;
+//}
