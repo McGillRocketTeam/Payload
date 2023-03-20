@@ -38,20 +38,7 @@ File dataCollection;
 
 // the setup routine runs once when you press reset:
 void setup()
-{
-  //Setting up CAN Bus
-  can1.begin();
-  can1.setBaudRate(250000); //todo check baudrate
-  can1.setMaxMB(16);
-  can1.enableFIFO();
-  can1.enableFIFOInterrupt();
-  can1.onReceive(canSniff); // interrupts and goes into the canSniff function when a message is received
-  can1.mailboxStatus();
-  
-  //Setting up filters for CAN bus
-  can1.setFIFOFilter(REJECT_ALL); // Block data before setting filter
-  can1.setFIFOFilter(1, 0x11, STD); // Only receive messages with ID 0x11
-  
+{     
   // initialize the digital pin as an output.
   pinMode(led, OUTPUT);
   Serial.begin(9600);
@@ -60,18 +47,40 @@ void setup()
   Serial.println("READY");
   Serial.begin(9600);
 
-  while (!SD.begin(BUILTIN_SDCARD))
+
+//uncomment this if there is an SD card
+//while (!SD.begin(BUILTIN_SDCARD))
+  while (SD.begin(BUILTIN_SDCARD))
+
     ;
   Serial.println("SD Card initialized");
 
-  // delete file if previously initialized
-  SD.remove("dataCollection.csv");
-  dataCollection = SD.open("dataCollection.csv", FILE_WRITE | FILE_READ);
+//  // delete file if previously initialized
+//  SD.remove("dataCollection.csv");
+//  dataCollection = SD.open("dataCollection.csv", FILE_WRITE | FILE_READ);
+
+  //Setting up CAN Bus
+  can2.begin();
+  can2.setBaudRate(100000);
+  can2.setMaxMB(16);
+  can2.enableFIFO();
+  can2.enableFIFOInterrupt();
+  can2.onReceive(canSniff); // interrupts and goes into the canSniff function when a message is received
+  can2.mailboxStatus();
+  
+  //Setting up filters for CAN bus
+  can2.setFIFOFilter(REJECT_ALL); // Block data before setting filter
+  can2.setFIFOFilter(1, 0x11, STD); // Only receive messages with ID 0x11
+  can2.setFIFOFilter(2, 0x12, STD); 
+  can2.setFIFOFilter(3, 0x17, STD); 
+  can2.setFIFOFilter(4, 0x18, STD); 
+  can2.setFIFOFilter(5, 0x5, STD); 
+  can2.setFIFOFilter(6, 0x6, STD); 
+
 }
 
 void collectAnalog(int count)
 {
-  // Serial.println("Foo Called");
   analogReadResolution(10);
 
   // Read count
@@ -114,20 +123,56 @@ float calcFFT(double vReal[], double vImag[], uint16_t samples)
   return x;
 }
 
+
+float randomFloat(float a, float b) {
+    float random = ((float) rand()) / (float) RAND_MAX;
+    float diff = b - a;
+    float r = random * diff;
+    return a + r;
+}
+
 int counter = 0;
 int t = millis();
 int periodLength = 397;
 int maxCount = 250000;
 int counter2 = 0;
-// the loop runs when the data is
 
 bool isSampling = false;
-bool isScrubReset = false; // Value to be added in code
+bool isScrubReset = false; 
 bool isShutDown = false;
+
 
 // Receive message from FC
 void canSniff(const CAN_message_t &msg) {
-  if (msg.buf[0] == 1) isSampling = true;
+  Serial.print("MB: "); Serial.print(msg.mb);
+  Serial.print("  OVERRUN: "); Serial.print(msg.flags.overrun);
+  Serial.print("  LEN: "); Serial.print(msg.len);
+  Serial.print(" EXT: "); Serial.print(msg.flags.extended);
+  Serial.print(" TS: "); Serial.print(msg.timestamp);
+  Serial.print(" ID: "); Serial.print(msg.id, HEX);
+  Serial.print(" Buffer: ");
+  for ( uint8_t i = 0; i < msg.len; i++ ) {
+    Serial.print(msg.buf[i], HEX); Serial.print(" ");
+  } Serial.println();
+
+  if (msg.id == 0x11 || msg.id == 0x12) {
+    if(msg.buf[0] == 1){
+        isSampling = true;
+Serial.println("is sampling true");
+    } else if (msg.buf[0] == 0){
+      isSampling = false;
+Serial.println("is sampling false");
+    }
+  } 
+
+  if (msg.id == 0x17 || msg.id == 0x18) {
+      isShutDown = true;
+Serial.println("shut down");
+  }
+  
+  if (msg.id == 0x5 || msg.id == 0x6) {
+      isScrubReset = true;
+  } 
 }
 
 /**
@@ -142,6 +187,7 @@ void canSniff(const CAN_message_t &msg) {
  */
 void loop()
 {
+  can2.events(); 
 
   if (isSampling && !isScrubReset && !isShutDown)
   {
@@ -157,26 +203,61 @@ void loop()
 
     counter++;
 
+//                    Serial.println(counter);
+//                    Serial.println(samples);
+
     if (counter == samples)
     {
-      // int t1 = micros();
 
-      float frqX = calcFFT(vRealX, vImagX, samples);
-      float ampX = findMaxInArr(vRealX) / 100000;
-      float frqY = calcFFT(vRealY, vImagY, samples);
-      float ampY = findMaxInArr(vRealY) / 100000;
-      float frqZ = calcFFT(vRealZ, vImagZ, samples);
-      float ampZ = findMaxInArr(vRealZ) / 100000;
+      // int t1 = micros();
+//==========Test Data=============
+//      float frqX = calcFFT(vRealX, vImagX, samples);
+//      float ampX = findMaxInArr(vRealX) / 100000;
+//      float frqY = calcFFT(vRealY, vImagY, samples);
+//      float ampY = findMaxInArr(vRealY) / 100000;
+//      float frqZ = calcFFT(vRealZ, vImagZ, samples);
+//      float ampZ = findMaxInArr(vRealZ) / 100000;
+
+
+//      const float frqX = 43.23;   //00 000010 10 11
+//      const float frqY = 752.23;  //101111 0000
+//      const float frqZ = 902.32;  //1110 000110
+//       
+//      const float ampX = 3.2 ;  // 00000101 000000
+//      const float ampY = 2.1;  //01 1010010
+//      const float ampZ = 1.4;  //0 10001100
+//      
+//      const int minutes = 0;
+//      const int seconds = 12;
+//      const int milliseconds = 0;
+
+      float frqX = random(0, 1100);
+      float frqY = random(0, 1100);
+      float frqZ = random(0, 1100);
+    
+      float ampX = randomFloat(0, 5);
+      float ampY = randomFloat(0, 5);
+      float ampZ = randomFloat(0, 5);
+    
+      int minutes = random(0, 59);
+      int seconds = random(0, 59);
+      int milliseconds = random(0, 1000);
+//===========End Test Data=============
 
       // PRINT OUTPUT : Serial.println(String(frqX) + "," + String(frqY) + "," + String(frqZ));
 
-      Serial.println(millis() - t);
+//      Serial.println(millis() - t);
       t = millis();
 
+//TODO test this:
+//      int minutes = getMinutes(t);
+//      int seconds = getSeconds(t);
+//      int milliseconds = getMilliseconds(t);
+      
       /* Sending data on CANBus*/
 
       // Initialize the structure with relevant data
-      struct Data dt = {frqX, frqY, frqZ, ampX, ampY, ampZ, 10, 11, 12}; //todo get time
+      struct Data dt = {frqX, frqY, frqZ, ampX, ampY, ampZ, minutes, seconds, milliseconds};
 
       // Declare 3 unions which will contain the messages to be sent
       union my_msg m1;
@@ -185,7 +266,7 @@ void loop()
       
       buildMsg(&m1, &m2, &m3, dt); // Concatenate the data and format it to be sent in 10 bytes
       sendMsg(&m1, &m2, &m3); // Send the messages
-      
+            
       counter = 0;
     }
   }
