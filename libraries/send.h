@@ -84,14 +84,13 @@ uint32_t formatAmp(float ampX, float ampY, float ampZ){
 }
 
 int getMinutes(int milliseconds){
-  Serial.println(milliseconds/60000);
-  return (milliseconds/60000);
+  return (milliseconds/60000); //integer division
 }
 int getSeconds(int milliseconds){
   return (milliseconds/1000) % 60;
 }
 int getMillis(int milliseconds){
-  return (milliseconds)- getMinutes(milliseconds)-getSeconds(milliseconds);
+  return (milliseconds)- getMinutes(milliseconds)*60000-getSeconds(milliseconds)*1000;
 }
 
 /**
@@ -113,8 +112,8 @@ uint32_t formatTime(int minutes, int seconds, int milliseconds){
 /**
  * Concatenates all the data into 3 messages so they can be sent through can bus.
  * msg structure:
- *     msg1: 00FFFFFF FFFFFFFF FFFFFFFF FFFFFFFF
- *     msg2: 0000000A AAAAAAAA AAAAAAAA AAAAAAAA
+ *     msg1: 00FxFxFxFxFxFx FxFxFxFxFyFyFyFy FyFyFyFyFyFyFzFz FzFzFzFzFzFzFzFz
+ *     msg2: 00000AxAxAx AxAxAxAxAxAxAyAy AyAyAyAyAyAyAyAz AzAzAzAzAzAzAzAz
  *     msg3: 0SMMMMMM ssssssmm mmmmmmmm (where S is payload sampling, M is minute, s is seconds and m is milliseconds)
  *  Finally, store the formatted messages into the my_msg union
  */
@@ -138,6 +137,7 @@ void buildMsg(union my_msg *uMsg1, union my_msg *uMsg2, union my_msg *uMsg3, str
  * Each CAN transmission can carry 8 bytes of data
  * The first CAN transmission will deliver msg1 and msg2 (all 8 buffers will contain relevant data: 8 bytes) with CANID 0x300
  * The second transmission will deliver msg3 (only buffers 0 and 1 will contain relevant data: 2 bytes) with CANID 0x301
+ * 
  */
 void sendMsg(union my_msg *uMsg1, union my_msg *uMsg2, union my_msg *uMsg3){
   can2.events();
