@@ -18,6 +18,7 @@ Input vectors receive computed results from FFT
 #define SCL_PLOT 0x03
 
 // x-axis collection
+double adjFactor = 470/4.4; 
 double vRealX[samples];
 double vImagX[samples];
 // y-axis ccollection
@@ -109,7 +110,7 @@ unsigned long t = millis();
 // period of latency in microseconds between each data sample. 
 int periodLength = 397;
 unsigned long waitTime = 20000;
-unsigned long maxTime = 30000;
+unsigned long maxTime = 60000;
 unsigned long t_wait = millis() + waitTime;
 unsigned long t_max = millis() + maxTime + waitTime;
 // the loop runs when the data is
@@ -159,14 +160,15 @@ void loop()
 
       // collecting amplitude and frequency data from FFT.
       float frqX = calcFFT(vRealX, vImagX, samples);
-      float ampX = vRealX[(int) (frqX*samples/samplingFrequency)];
+      float ampX = PI*vRealX[(int) (frqX*samples/samplingFrequency)]/(samples*adjFactor);
       float frqY = calcFFT(vRealY, vImagY, samples);
-      float ampY = vRealY[(int) (frqY*samples/samplingFrequency)];
+      float ampY = PI*vRealY[(int) (frqY*samples/samplingFrequency)]/(samples*adjFactor);
       float frqZ = calcFFT(vRealZ, vImagZ, samples);
-      float ampZ = vRealZ[(int) (frqZ*samples/samplingFrequency)];
+      float ampZ = PI*vRealZ[(int) (frqZ*samples/samplingFrequency)]/(samples*adjFactor);
       int tS = millis();  
-       dataCollection.println(",,,,"+String(tS) + "," + String(frqX) + "," + String(frqY) + "," + String(frqZ) + "," + String(ampX) +"," + String(ampY) + "," + String(ampZ));
-
+      Serial.println(ampY);
+      dataCollection.println(",,,,"+String(tS) + "," + String(frqX) + "," + String(frqY) + "," + String(frqZ) + "," + String(ampX) +"," + String(ampY) + "," + String(ampZ));
+  
       // DATA PRINTOUT TO MONITOR:  
 //       Serial.println("frqX: " + String(frqX) + "Hz, frqY: " + String(frqY) + "Hz, frqZ: " + String(frqZ) +"Hz, ampX: " + String(ampX) +"Hz, ampY: " + String(ampY) + "Hz, ampZ: " + String(ampZ));
 
@@ -225,4 +227,31 @@ void loop()
     }
   }
   
+}
+
+void PrintVector(double *vData, uint16_t bufferSize, uint8_t scaleType)
+{
+  for (uint16_t i = 0; i < bufferSize; i++)
+  {
+    double abscissa;
+    /* Print abscissa value */
+    switch (scaleType)
+    {
+      case SCL_INDEX:
+        abscissa = (i * 1.0);
+  break;
+      case SCL_TIME:
+        abscissa = ((i * 1.0) / samplingFrequency);
+  break;
+      case SCL_FREQUENCY:
+        abscissa = ((i * 1.0 * samplingFrequency) / samples);
+  break;
+    }
+    Serial.print(abscissa, 6);
+    if(scaleType==SCL_FREQUENCY)
+      Serial.print("Hz");
+    Serial.print(" ");
+    Serial.println(vData[i]/2048, 4);
+  }
+  Serial.println();
 }
