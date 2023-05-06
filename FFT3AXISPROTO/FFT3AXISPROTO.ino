@@ -1,7 +1,7 @@
 #include <arduinoFFT.h>
 #include <SD.h>
 
-// arduinoFFT FFT = arduinoFFT(); // CREATE FFT object
+arduinoFFT FFT = arduinoFFT(); // CREATE FFT object
 
 const uint16_t samples = 2048; // This value MUST ALWAYS be a power of 2
 const uint8_t amplitude = 1023;
@@ -30,12 +30,6 @@ int led = 13;
 int blinkState = 0;
 File dataCollection;
 File fftData; 
-
-struct signMag {
-  float x; 
-  float v; 
-}
-
 // the setup routine runs once when you press reset:
 void setup()
 {
@@ -76,9 +70,9 @@ void collectAnalog(int count)
   // collecting data in csv file
 
   dataCollection.println(xTimeStamp + "," + vRealX[count] + "," + vRealY[count] + "," + vRealZ[count]);
-  
+
   //Serial.println(dataCollection.size());
-  Serial.println(xTimeStamp + "," + vRealX[count] + "," + vRealY[count] + "," + vRealZ[count]);
+  // Serial.println(xTimeStamp + "," + vRealX[count] + "," + vRealY[count] + "," + vRealZ[count]);
   vImagX[count] = 0;
   vImagY[count] = 0;
   vImagZ[count] = 0;
@@ -100,17 +94,14 @@ float findMaxInArr(double arr[])
 }
 
 // fft calculation of frequency of the Major Peak. 
-struct signMag calcFFT(double vReal[], double vImag[], uint16_t samples)
+float calcFFT(double vReal[], double vImag[], uint16_t samples)
 {
-  arduinoFFT FFT = arduinoFFT(vReal, vImag, samples, samplingFrequency); /* Create FFT object */
   FFT.Windowing(vReal, samples, FFT_WIN_TYP_HAMMING, FFT_FORWARD); /* Weigh data */
-  FFT.Compute(FFT_FORWARD);                 /* Compute FFT */
-  FFT.ComplexToMagnitude();                   /* Compute magnitudes */
+  FFT.Compute(vReal, vImag, samples, FFT_FORWARD);                 /* Compute FFT */
+  FFT.ComplexToMagnitude(vReal, vImag, samples);                   /* Compute magnitudes */
   float x;
-  float v; 
-  FFT.MajorPeak(&x, &v);
-  struct signMag ot = {x, v} 
-  return signMag; 
+  x = FFT.MajorPeak(vReal, samples, samplingFrequency);
+  return x;
 }
 
 int counter = 0;
@@ -118,7 +109,7 @@ unsigned long t = millis();
 // period of latency in microseconds between each data sample. 
 int periodLength = 397;
 unsigned long waitTime = 20000;
-unsigned long maxTime = 600000;
+unsigned long maxTime = 30000;
 unsigned long t_wait = millis() + waitTime;
 unsigned long t_max = millis() + maxTime + waitTime;
 // the loop runs when the data is
@@ -165,24 +156,22 @@ void loop()
     if (counter == samples)
     {
       // int t1 = micros();
+
       // collecting amplitude and frequency data from FFT.
-      struct signMag faX = calcFFT(vRealX, vImagX, samples);
-      float frqX = faX.x;
-      float ampX = faX.v;
-      struct signMag faY = calcFFT(vRealY, vImagY, samples);
-      float frqY = faY.x; 
-      float ampY = faY.v;
-      struct signMag faZ = calcFFT(vRealZ, vImagZ, samples);
-      float frqZ = faZ.x; 
-      float ampZ = faZ.v;
-      int tS = millis(); 
-
+      float frqX = calcFFT(vRealX, vImagX, samples);
+      float ampX = vRealX[(int) (frqX*samples/samplingFrequency)];
+      float frqY = calcFFT(vRealY, vImagY, samples);
+      float ampY = vRealY[(int) (frqY*samples/samplingFrequency)];
+      float frqZ = calcFFT(vRealZ, vImagZ, samples);
+      float ampZ = vRealZ[(int) (frqZ*samples/samplingFrequency)];
+      int tS = millis();  
        dataCollection.println(",,,,"+String(tS) + "," + String(frqX) + "," + String(frqY) + "," + String(frqZ) + "," + String(ampX) +"," + String(ampY) + "," + String(ampZ));
+
       // DATA PRINTOUT TO MONITOR:  
-       Serial.println("frqX: " + String(frqX) + "Hz, frqY: " + String(frqY) + "Hz, frqZ: " + String(frqZ) +"Hz, ampX: " + String(ampX) +"Hz, ampY: " + String(ampY) + "Hz, ampZ: " + String(ampZ));
+//       Serial.println("frqX: " + String(frqX) + "Hz, frqY: " + String(frqY) + "Hz, frqZ: " + String(frqZ) +"Hz, ampX: " + String(ampX) +"Hz, ampY: " + String(ampY) + "Hz, ampZ: " + String(ampZ));
 
 
-      Serial.println(millis() - t);
+     // Serial.println(millis() - t);
       t = millis();
 
       // TODO : send frequencies through CAN bus (frqX, frqY, frqZ)
