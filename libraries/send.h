@@ -30,44 +30,44 @@ union my_msg {
 };
 
 /**
- * Given 3 frequency values, concatenates and stores them into a 32 bit unsigned int. 
- * Only the least significant 30 of the 32 bits are used
+ * Given 3 frequency values, concatenates and stores them (partly) into a 32 bit unsigned int. 
  * 
- * Of these 30 bits:
- *   Most significant 10 bits encode the frqX, 
- *   then the next 10 encode frqY,
- *   the least significant 10 are for frqZ
- *   ie. xxxxxxxxxxyyyyyyyyyyzzzzzzzzzz
+ * Of these 32 bits:
+ *   Most significant 12 bits encode the frqX, 
+ *   then the next 12 encode frqY,
+ *   the least significant 8 are for the most significant part of frqZ
+ *   ie. xxxxxxxxxxxxyyyyyyyyyyyyzzzzzzzz
  *
- * The frequencies should only go up to 1000 Hz but if ever there is 
+ * The frequencies should only go up to 4000 Hz but if ever there is 
  * an overflow, it is indicated by all 1's. 
  */
 uint32_t formatFrq(float frqX, float frqY, float frqZ) {
   uint32_t formattedFrqs;
   // round the frequencies to the nearest unit before shifting
   int roundedFrqX = lroundf(frqX);
-  if (frqX > 1000) roundedFrqX = 1023; //use 1111111111 to indicate overflow
+  //overflow for freqX will be indicated in a different place (the message that contains the amplitude bits)
 
   int roundedFrqY = lroundf(frqY);
-  if (frqY > 1000) roundedFrqY = 1023;
+  if (frqY > 1000) roundedFrqY = 4095; //use 111111111111 to indicate overflow
 
   int roundedFrqZ = lroundf(frqZ);
-  if (frqZ > 1000) roundedFrqZ = 1023;
+  if (frqZ > 1000) roundedFrqZ = 4095; //use 111111111111 to indicate overflow
 
-  formattedFrqs = (roundedFrqZ & 1023) | ((roundedFrqY & 1023) << 10) | ((roundedFrqX & 1023) << 20); // 1023 is 0b1111111111.
+  formattedFrqs = (roundedFrqZ & 4095) >> 4 | ((roundedFrqY & 4095) << 8) | ((roundedFrqX & 4095) << 20); // 4095 is 0b111111111111.
   return formattedFrqs;
 }
 
 /**
- * Given 3 amplitude values, concatenates and stores them into a 32 bit unsigned int. 
- * Only the least significant 27 of the 32 bits are used
+ * Given 3 amplitude values and part of the frequency value, concatenates and stores them into a 32 bit unsigned int. 
+ * Only the least significant 31 of the 32 bits are used
  
- * Of these 27 bits:
- *   Most significant 9 bits encode the frqX, 
+ * Of these 31 bits:
+ *   Most significant 4 bits encode 
+ *   Next 9 bits encode the frqX, 
  *   then the next 9 encode frqY,
  *   the least significant 9 are for frqZ
  */
-uint32_t formatAmp(float ampX, float ampY, float ampZ){
+uint32_t formatAmp(float ampX, float ampY, float ampZ, float frqZ){
   uint32_t formattedAmps;
   //multiply the amplitudes by 100 such that 2 decimals of precision can be kept. Then round to the nearest unit
   int roundedAmpX = lroundf(ampX * 100);
@@ -79,7 +79,9 @@ uint32_t formatAmp(float ampX, float ampY, float ampZ){
   int roundedAmpZ = lroundf(ampZ * 100);
   if (ampZ > 3.3) roundedAmpZ = 511;
 
-  formattedAmps = (roundedAmpZ & 511) | ((roundedAmpY & 511) << 9) | ((roundedAmpX & 511) << 18); // 511 is 0b111111111. Most significant 9 bits encode the ampX, then the next 9 encode ampY,the leas significant 9 are for ampZ
+  int roundedFrqZ = lroundf(frqZ);
+  
+  formattedAmps = (roundedAmpZ & 511) | ((roundedAmpY & 511) << 9) | ((roundedAmpX & 511) << 18 | (roundedFrqZ & 4095) << 27); // 511 is 0b111111111. Most significant 9 bits encode the ampX, then the next 9 encode ampY,the leas significant 9 are for ampZ
   return formattedAmps;
 }
 
@@ -112,14 +114,14 @@ uint32_t formatTime(int minutes, int seconds, int milliseconds){
 /**
  * Concatenates all the data into 3 messages so they can be sent through can bus.
  * msg structure:
- *     msg1: 00FxFxFxFxFxFx FxFxFxFxFyFyFyFy FyFyFyFyFyFyFzFz FzFzFzFzFzFzFzFz
- *     msg2: 00000AxAxAx AxAxAxAxAxAxAyAy AyAyAyAyAyAyAyAz AzAzAzAzAzAzAzAz
+ *     msg1: FxFxFxFxFxFxFxFx FxFxFxFxFyFyFyFy FyFyFyFyFyFyFyFy FzFzFzFzFzFzFzFz
+ *     msg2: 0FzFzFzFzAxAxAx AxAxAxAxAxAxAyAy AyAyAyAyAyAyAyAz AzAzAzAzAzAzAzAz
  *     msg3: 0SMMMMMM ssssssmm mmmmmmmm (where S is payload sampling, M is minute, s is seconds and m is milliseconds)
  *  Finally, store the formatted messages into the my_msg union
  */
 void buildMsg(union my_msg *uMsg1, union my_msg *uMsg2, union my_msg *uMsg3, struct Data dt){
   uint32_t formattedFrq = formatFrq(dt.frqX, dt.frqY, dt.frqZ);
-  uint32_t formattedAmp = formatAmp(dt.ampX, dt.ampY, dt.ampZ);
+  uint32_t formattedAmp = formatAmp(dt.ampX, dt.ampY, dt.ampZ, dt.frqZ);
   uint32_t formattedTime = formatTime(dt.minutes, dt.seconds, dt.milliseconds);
  
   uint32_t msg1 = (formattedFrq); 
