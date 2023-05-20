@@ -45,13 +45,13 @@ uint32_t formatFrq(float frqX, float frqY, float frqZ) {
   uint32_t formattedFrqs;
   // round the frequencies to the nearest unit before shifting
   int roundedFrqX = lroundf(frqX);
-  //overflow for freqX will be indicated in a different place (the message that contains the amplitude bits)
-
+  if (frqZ > 4000) roundedFrqZ = 255; //use 11111111 to indicate overflow
+  
   int roundedFrqY = lroundf(frqY);
-  if (frqY > 1000) roundedFrqY = 4095; //use 111111111111 to indicate overflow
+  if (frqY > 4000) roundedFrqY = 4095; //use 111111111111 to indicate overflow
 
   int roundedFrqZ = lroundf(frqZ);
-  if (frqZ > 1000) roundedFrqZ = 4095; //use 111111111111 to indicate overflow
+  if (frqZ > 4000) roundedFrqZ = 4095; //use 111111111111 to indicate overflow
 
   formattedFrqs = (roundedFrqZ & 4095) >> 4 | ((roundedFrqY & 4095) << 8) | ((roundedFrqX & 4095) << 20); // 4095 is 0b111111111111.
   return formattedFrqs;
@@ -80,7 +80,7 @@ uint32_t formatAmp(float ampX, float ampY, float ampZ, float frqZ){
   if (ampZ > 3.3) roundedAmpZ = 511;
 
   int roundedFrqZ = lroundf(frqZ);
-  
+
   formattedAmps = (roundedAmpZ & 511) | ((roundedAmpY & 511) << 9) | ((roundedAmpX & 511) << 18 | (roundedFrqZ & 4095) << 27); // 511 is 0b111111111. Most significant 9 bits encode the ampX, then the next 9 encode ampY,the leas significant 9 are for ampZ
   return formattedAmps;
 }
