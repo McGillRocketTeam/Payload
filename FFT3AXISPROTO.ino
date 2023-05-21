@@ -6,9 +6,9 @@
 
 arduinoFFT FFT = arduinoFFT(); // CREATE FFT object
 
-const uint16_t samples = 2048; // This value MUST ALWAYS be a power of 2
-const uint8_t amplitude = 1023;
-const double samplingFrequency = 2500;
+const uint16_t samples = 8192; // This value MUST ALWAYS be a power of 2. the FFT takes 4x5ms=20 ms to compute
+int periodLength = 100; //delay between each time we collect analog data (in microseconds). Needs to be changed when samplingFrequency changes 
+const double samplingFrequency = 10000;
 const uint16_t flushFrequency = 3000; //time to wait between flushes
 
 /*
@@ -22,6 +22,7 @@ const uint16_t flushFrequency = 3000; //time to wait between flushes
 #define SCL_PLOT 0x03
 
 // x-axis collection
+double adjFactor = 470/4.4;
 double vRealX[samples];
 double vImagX[samples];
 // y-axis ccollection
@@ -30,12 +31,33 @@ double vImagY[samples];
 // z - axis collection
 double vRealZ[samples];
 double vImagZ[samples];
-int led = 13;
 
-//offset time
-uint32_t offsetTime=0;
+//CAN BUS/ Payload State params
+volatile bool isSampling = true;
+volatile bool isScrubReset = false;
+volatile bool isShutDown = false;
+uint32_t offsetTime=0; //offset time which will be used in scrub to reset time to 0
+
+
+uint32_t getTime() { //offset time gets update each time AV sends a scrub CAN message. Solution to not being able to reset millis()
+  return (millis()-offsetTime);
+}
+
 
 File dataCollection;
+bool serialTest=true;
+//LED params. By default the params on 5 next line are for no LED blinking
+int led = 13;
+int blinkState = 0;
+bool blinkingLEDtoMonitorState=true; //if true we are monitoring the state of the payload via onboard LED blinking
+uint32_t t = getTime();
+uint32_t t_wait = 0;
+uint32_t t_max = 4294967295;
+bool initialWait = false;
+//FFT param
+int counter = 0;
+//Flush param
+uint32_t flushTime = getTime(); // to k-eep track of when the last flush was
 
 
 // the setup routine runs once when you press reset:
@@ -51,52 +73,13 @@ void setup()
 
 
 
-  while (!SD.begin(BUILTIN_SDCARD))
-    ;
-  Serial.println("SD Card initialized");
+  while (!SD.begin(BUILTIN_SDCARD));
+  if (serialTest) {Serial.println("SD Card initialized");};
 
   // delete file if previously initialized
   SD.remove("dataCollection.csv");
   dataCollection = SD.open("dataCollection.csv", FILE_WRITE | FILE_READ);
-
-  //==================TESTING SD===================
-  //int current = millis();
-  //bool runLoop = true;
-  //while(runLoop){
-  //// for(int i=0; i<10; i++){
-  //int myTime = millis()-current;
-  //  if (dataCollection)
-  //  {
-  //    Serial.println("Writing to the text file...");
-  //      dataCollection.println(myTime);
-  ////      if (i%2 == 0 )
-  //      {dataCollection.flush();}
-  //  } else
-  //  {
-  //    // if the file didn't open, report an error:
-  //    Serial.println("error opening the text file!");
-  //  }
-  //  if (myTime >5000) runLoop = false;
-  // }
-  //  // re-open the text file for reading:
-  //  dataCollection = SD.open("dataCollection.csv");
-  //  if (dataCollection)
-  //  {
-  //    Serial.println("textFile.txt:");
-  //
-  //    // read all the text written on the file
-  //    while (dataCollection.available())
-  //    {
-  //      Serial.write(dataCollection.read());
-  //    }
-  //  } else
-  //  {
-  //    // if the file didn't open, report an error:
-  //    Serial.println("error opening the text file!");
-  //  }
-  //
-  //===================END=========================
-
+  dataCollection.println("time,amplitude X (1023),amplitude Y (1023),amplitude Z,timeFFT,frqX,frqY,frqZ,ampX,ampY,ampZ");
 
 
   //Setting up CAN Bus
@@ -116,15 +99,30 @@ void setup()
   can2.setFIFOFilter(4, 0x18, STD);
   can2.setFIFOFilter(5, 0x5, STD);
   can2.setFIFOFilter(6, 0x6, STD);
+
+  //LED 
+  if (blinkingLEDtoMonitorState) {
+    t = getTime();  
+    unsigned long waitTime = 20000;
+    unsigned long maxTime = 30000;
+    t_wait = getTime() + waitTime;
+    t_max = getTime() + maxTime + waitTime;
+    initialWait = true;
+  }
+  else {
+    t = getTime();
+    t_wait = 0;
+    t_max = 4294967295;
+    initialWait = false;
+  }
+  
 }
 
-uint32_t getTime() {
-  return (millis()-offsetTime);
-}
-struct dateTime {
+
+struct dateTime { 
   uint8_t minutes;
   uint8_t seconds;
-  uint16_t milliseconds;
+  uint32_t milliseconds;
 };
 
 
@@ -140,7 +138,7 @@ struct dateTime convertmillis (uint32_t milli) {
   uint8_t sec = milli / 1000;
   milli = milli - 1000 * sec;
 
-  return (struct dateTime) {mins, sec, (uint16_t) milli};
+  return (struct dateTime) {mins, sec, milli}; 
 }
 
 void collectAnalog(int count)
@@ -149,15 +147,13 @@ void collectAnalog(int count)
 
   // Read count
   vRealX[count] = analogRead(A10);
-  String xTimeStamp = String(getTime());
+  String TimeStamp = String(getTime());
   vRealY[count] = analogRead(A11);
-  String yTimeStamp = String(getTime());
   vRealZ[count] = analogRead(A12);
-  String zTimeStamp = String(getTime());
 
   // collecting data in csv file
 
-  dataCollection.println(xTimeStamp + "," + yTimeStamp + "," + zTimeStamp + "," + vRealX[count] + "," + vRealY[count] + "," + vRealZ[count]);
+  dataCollection.println(TimeStamp + "," + vRealX[count] + "," + vRealY[count] + "," + vRealZ[count]);
   vImagX[count] = 0;
   vImagY[count] = 0;
   vImagZ[count] = 0;
@@ -194,41 +190,37 @@ float randomFloat(float a, float b) {
   return a + r;
 }
 
-int counter = 0;
-int t = getTime();
-int flushTime = getTime(); // to k-eep track of when the last flush was
-int periodLength = 397;
-int maxCount = 250000;
-int counter2 = 0;
 
-volatile bool isSampling = true;
-volatile bool isScrubReset = false;
-volatile bool isShutDown = false;
 
-volatile bool test = false;
+ 
+
 
 // Receive message from FC
 void canSniff(const CAN_message_t &msg) {
-  Serial.print("MB: "); Serial.print(msg.mb);
-  Serial.print("  OVERRUN: "); Serial.print(msg.flags.overrun);
-  Serial.print("  LEN: "); Serial.print(msg.len);
-  Serial.print(" EXT: "); Serial.print(msg.flags.extended);
-  Serial.print(" TS: "); Serial.print(msg.timestamp);
-  Serial.print(" ID: "); Serial.print(msg.id, HEX);
-  Serial.print(" Buffer: ");
-  for ( uint8_t i = 0; i < msg.len; i++ ) {
-    Serial.print(msg.buf[i], HEX); Serial.print(" ");
-  } Serial.println();
-
+  if (serialTest) {
+    Serial.print("MB: "); Serial.print(msg.mb);
+    Serial.print("  OVERRUN: "); Serial.print(msg.flags.overrun);
+    Serial.print("  LEN: "); Serial.print(msg.len);
+    Serial.print(" EXT: "); Serial.print(msg.flags.extended);
+    Serial.print(" TS: "); Serial.print(msg.timestamp);
+    Serial.print(" ID: "); Serial.print(msg.id, HEX);
+    Serial.print(" Buffer: ");  
+    for ( uint8_t i = 0; i < msg.len; i++ ) {
+    Serial.print(msg.buf[i], HEX); 
+    Serial.print(" ");
+    } 
+    Serial.println();
+  }
   //Receive messages from AV
   if (msg.id == 0x11 || msg.id == 0x12) {
     if (msg.buf[0] == 1) {
       isSampling = true;
     } else if (msg.buf[0] == 0) {
-      union my_msg p1;
+      //before sswitching isSampling to false, we need to send an ack to AV to so they see isSampling=0 and for data to be all 0's
+      union my_msg p1; //this union creates an array of 0's
       union my_msg p2;
       union my_msg p3;
-      struct Data ack = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+      struct Data ack = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; //before sswitching isSampling to false, we need to send an ack to AV to so they see isSampling=0 and for data to be all 0's
       buildMsg(&p1, &p2, &p3, ack); // Concatenate the data and format it to be sent in 10 bytes
       sendMsg(&p1, &p2, &p3); // Send the messages
       isSampling = false;
@@ -254,21 +246,13 @@ void canSniff(const CAN_message_t &msg) {
    will then perform the scrub reset and put isScrubReset back to (false) default value
    CAN bus MUST send a shutdown message before cutting power, which should switch isShutDown to true
 */
-int startTime = getTime(); // testing purposes
 
 void loop()
 {
   can2.events();
-  if (isSampling && !isScrubReset && !isShutDown)
+  t = getTime();
+  if (isSampling && !isScrubReset && !isShutDown && t < t_max && !initialWait)
   {
-    /*//====testing====
-    dataCollection.println(millis() - startTime);
-
-    if (millis() - startTime > 900) {
-      test = false;
-    }
-    Serial.println(millis() - startTime );*/
-    //==============
 
     if (getTime() - flushTime > flushFrequency) {
       dataCollection.flush();
@@ -293,16 +277,15 @@ void loop()
     if (counter == samples)
     {
 
-      uint32_t t1 = getTime();
-      //uint32_t t1 = 830209; // 13 mins, 9 seconds,209 milliseconds
-      struct dateTime convertedTime = convertmillis(t1);
       //==========Test Data=============
-      //      float frqX = calcFFT(vRealX, vImagX, samples);
-      //      float ampX = findMaxInArr(vRealX) / 100000;
-      //      float frqY = calcFFT(vRealY, vImagY, samples);
-      //      float ampY = findMaxInArr(vRealY) / 100000;
-      //      float frqZ = calcFFT(vRealZ, vImagZ, samples);
-      //      float ampZ = findMaxInArr(vRealZ) / 100000;
+      float frqX = calcFFT(vRealX, vImagX, samples);
+      float ampX = PI*vRealX[(int) (frqX*samples/samplingFrequency)]/(samples*adjFactor);
+      float frqY = calcFFT(vRealY, vImagY, samples);
+      float ampY = PI*vRealY[(int) (frqY*samples/samplingFrequency)]/(samples*adjFactor);
+      float frqZ = calcFFT(vRealZ, vImagZ, samples);
+      float ampZ = PI*vRealZ[(int) (frqZ*samples/samplingFrequency)]/(samples*adjFactor);
+      uint32_t tS = getTime();
+      dataCollection.println(",,,,"+String(tS) + "," + String(frqX) + "," + String(frqY) + "," + String(frqZ) + "," + String(ampX) +"," + String(ampY) + "," + String(ampZ));
 
 
 //            const float frqX = 43.23;//00 000010 1011
@@ -312,22 +295,20 @@ void loop()
 //            const float ampX = 3.2 ;  // 00000101 000000
 //            const float ampY = 2.1;  //01 1010010
 //            const float ampZ = 1.4;  //0 10001100
-//      
+      
 //            const int minutes = 0;
 //            const int seconds = 12;
 //            const int milliseconds = 45;
 
-            const float frqX = 4243.23;//00 000010 1011
-            const float frqY = 4952.23;  //101111 0000
-            const float frqZ = 5102.32;  //1110 000110
+//            const float frqX = 4243.23;//00 000010 1011
+//            const float frqY = 4952.23;  //101111 0000
+//            const float frqZ = 5102.32;  //1110 000110
+//      
+//            const float ampX = 4.2 ;  // 00000101 000000
+//            const float ampY = 24.1;  //01 1010010
+//            const float ampZ = 14.4;  //0 10001100
       
-            const float ampX = 4.2 ;  // 00000101 000000
-            const float ampY = 24.1;  //01 1010010
-            const float ampZ = 14.4;  //0 10001100
-      
-//            const int minutes = 0;
-//            const int seconds = 12;
-//            const int milliseconds = 45;
+
 
       /*float frqX = random(0, 1100);
       float frqY = random(0, 1100);
@@ -341,18 +322,12 @@ void loop()
       int seconds = random(0, 59);
       int milliseconds = random(0, 1000);*/
       //===========End Test Data=============
-
-      // PRINT OUTPUT : Serial.println(String(frqX) + "," + String(frqY) + "," + String(frqZ));
-
-      //      Serial.println(millis() - t);
-      t = getTime();
-
-//      int minutes = getMinutes(millis() - startTime);
-//      int seconds = getSeconds(millis() - startTime);
-//      int milliseconds = getMillis(millis()startTime);
-
+          
+      
+      
       /* Sending data on CANBus*/
-
+      uint32_t t1 = getTime();
+      struct dateTime convertedTime = convertmillis(t1);
       // Initialize the structure with relevant data
       struct Data dt = {frqX, frqY, frqZ, ampX, ampY, ampZ, isSampling, convertedTime.minutes, convertedTime.seconds, convertedTime.milliseconds};
 
@@ -364,42 +339,51 @@ void loop()
       buildMsg(&m1, &m2, &m3, dt); // Concatenate the data and format it to be sent in 10 bytes
       sendMsg(&m1, &m2, &m3); // Send the messages
       counter = 0;
-    }
 
-    if (test) {
-      dataCollection = SD.open("dataCollection.csv");
-      if (dataCollection)
-      {
-        Serial.println("textFile.txt:");
-
-        // read all the text written on the file
-        while (dataCollection.available())
-        {
-          Serial.write(dataCollection.read());
-        }
-      } else
-      {
-        // if the file didn't open, report an error:
-        Serial.println("error opening the text file!");
+      if (blinkState == 0 && blinkingLEDtoMonitorState){
+        digitalWrite(led, HIGH);
+        blinkState = 1;
       }
-      exit(0);
+      else if (blinkState == 1 && blinkingLEDtoMonitorState){
+        digitalWrite(led, LOW);
+        blinkState = 0;
+      }
+    }
+      t = getTime();
+    }
+    else if (initialWait && blinkingLEDtoMonitorState) {
+      digitalWrite(led, HIGH);
+      delay(100);
+      digitalWrite(led, LOW);
+      delay(5000);
+      t = getTime();
+      if(t > t_wait){
+      initialWait = false;
+      }
+    }  
+    else
+    {
+      t = getTime();
+      if (t > t_max && blinkingLEDtoMonitorState ){
+        digitalWrite(led, HIGH);
+        delay(100);
+        digitalWrite(led, LOW);
+        delay(100);
+        //dont you dare change the value of isSmapling or close dataCollection
+      }
+      if (isShutDown)
+      {
+        dataCollection.close();
+      }
+      if (isScrubReset)
+      {
+        dataCollection.close();
+        SD.remove("dataCollection.csv");
+        dataCollection = SD.open("dataCollection.csv", FILE_WRITE | FILE_READ);
+        offsetTime=millis();
+        t = getTime();
+        isScrubReset = false;
+      }
     }
 
-  }
-  else
-  {
-    if (isShutDown)
-    {
-      dataCollection.close();
-    }
-    if (isScrubReset)
-    {
-      dataCollection.close();
-      SD.remove("dataCollection.csv");
-      dataCollection = SD.open("dataCollection.csv", FILE_WRITE | FILE_READ);
-      offsetTime=millis();
-      isScrubReset = false;
-    }
-  }
-  counter2++;
 }
