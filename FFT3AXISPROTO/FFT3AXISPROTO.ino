@@ -109,6 +109,16 @@ void setup()
     t_max = getTime() + maxTime + waitTime;
     initialWait = true;
   }
+
+  digitalWrite(led, HIGH);
+  delay(500);
+  digitalWrite(led, LOW);
+  delay(500);
+  digitalWrite(led, HIGH);
+  delay(500);
+  digitalWrite(led, LOW);
+
+  
   
 }
 
