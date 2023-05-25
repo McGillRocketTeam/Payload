@@ -33,7 +33,7 @@ double vRealZ[samples];
 double vImagZ[samples];
 
 //CAN BUS/ Payload State params
-volatile bool isSampling = true;
+volatile bool isSampling = false;
 volatile bool isScrubReset = false;
 volatile bool isShutDown = false;
 uint32_t offsetTime=0; //offset time which will be used in scrub to reset time to 0
@@ -59,10 +59,12 @@ int counter = 0;
 //Flush param
 uint32_t flushTime = getTime(); // to k-eep track of when the last flush was
 
+//extern "C" uint32_t set_arm_clock(uint32_t frequency);
 
 // the setup routine runs once when you press reset:
 void setup()
 {
+  //set_arm_clock(100'000'000);
   // initialize the digital pin as an output.
   pinMode(led, OUTPUT);
   Serial.begin(9600);
@@ -70,7 +72,6 @@ void setup()
   //  ;
   Serial.println("READY");
   Serial.begin(9600);
-
 
 
   while (!SD.begin(BUILTIN_SDCARD));
@@ -261,8 +262,10 @@ void canSniff(const CAN_message_t &msg) {
 
 void loop()
 {
+  
   can2.events();
   t = getTime();
+  
   if (isSampling && !isScrubReset && !isShutDown && t < t_max && !initialWait)
   {
 
@@ -276,6 +279,7 @@ void loop()
     int beforeExec = micros();
     collectAnalog(counter);
     int leftOverDelay = periodLength - (micros() - beforeExec);
+    //Serial.println(leftOverDelay);
     if (leftOverDelay > 0)
     {
       delayMicroseconds(leftOverDelay);
@@ -365,6 +369,7 @@ void loop()
     } 
     else
     {
+      //delay(100);
       t = getTime();
       if (isShutDown)
       {
@@ -374,11 +379,15 @@ void loop()
       {
         dataCollection.close();
         SD.remove("dataCollection.csv");
-        dataCollection = SD.open("dataCollection.csv", FILE_WRITE | FILE_READ);
+        //dataCollection = SD.open("dataCollection.csv", FILE_WRITE | FILE_READ);
         offsetTime=millis();
-        t = getTime();
         isScrubReset = false;
+        doReboot();
       }
     }
 
+}
+
+void doReboot() {
+  SCB_AIRCR = 0x05FA0004;
 }

@@ -59,7 +59,7 @@ uint64_t formatMsg1(bool isSampling, float frqX, float frqY, float frqZ, float a
   if (roundedAmpY > 511) roundedAmpY = 511; //use 11111111 to indicate overflow
 
 
-  formattedMsg1 = (roundedAmpY & 511) | ((roundedAmpX & 511) << 9) |((roundedFrqZ & 16383) << 21) | ((roundedFrqY & 16383) << 35) | ((roundedFrqX & 16383) << 49)|((Samplingbit) << 63) ;
+  formattedMsg1 = (Samplingbit) | ((roundedFrqX & 16383) << 1) | ((roundedFrqY & 16383) << 15)| ((roundedFrqZ & 16383) << 29) | ((roundedAmpX & 511) << 46) | ((roundedAmpY & 511) << 55)   ;
   return formattedMsg1; 
 }
 
@@ -88,9 +88,9 @@ void buildMsg(union my_msg *uMsg1, union my_msg *uMsg2, struct Data dt){
   uint64_t msg2 = formatMsg2(dt.ampZ,dt.seconds);
  
 
-  char buf[100];
-  sprintf(buf, "%llu\t%llu\r\n", msg1, msg2);
-  Serial.println(buf);
+  //char buf[100];
+  //sprintf(buf, "%llu\t%llu\r\n", msg1, msg2);
+  
   uMsg1->msg = msg1;
   uMsg2->msg = msg2;
 }
@@ -111,9 +111,25 @@ void sendMsg(union my_msg *uMsg1, union my_msg *uMsg2){
   }
   can2.write(msg);
 
+  Serial.print(" ID: "); Serial.print(msg.id, HEX);
+  Serial.print(" Buffer: ");
+  for (uint8_t i = 0; i < 8; i++){
+    Serial.print(msg.buf[7-i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
+
   msg2.id = 0x301;
   for ( uint8_t i = 0; i < 8; i++ ) {
     msg2.buf[i] = uMsg2->bytes[i];
   }
   can2.write(msg2);
+
+  Serial.print(" ID: "); Serial.print(msg2.id, HEX);
+  Serial.print(" Buffer: ");
+  for (uint8_t i = 0; i < 8; i++){
+    Serial.print(msg2.buf[7-i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
 }
