@@ -91,10 +91,11 @@ void canSniff(const CAN_message_t &msg) {
     Serial.print(" ");
     } 
     Serial.println();
-    if(msg.id == 0x300){
-      decodeMsg1(msg.buf, &PL_State, &PL_FrqX, &PL_FrqY,&PL_FrqZ,&PL_AmpX,&PL_AmpY);
-    }
-    Serial.print(" State: "); Serial.print(PL_State); Serial.print(" FrqX: "); Serial.println(PL_FrqX);
+    
+    AV_FC_Decode(msg.id, msg.buf);
+    char dataBuffer[200];
+    int i = sprintPayload(dataBuffer);
+    Serial.println(dataBuffer);
   }
   
 }

@@ -6,9 +6,9 @@
 
 arduinoFFT FFT = arduinoFFT(); // CREATE FFT object
 
-const uint16_t samples = 4096; // This value MUST ALWAYS be a power of 2. the FFT takes 4x5ms=20 ms to compute
-unsigned long periodLength = 200; //delay between each time we collect analog data (in microseconds). Needs to be changed when samplingFrequency changes 
-const double samplingFrequency = 5000;
+const uint16_t samples = 8192; // This value MUST ALWAYS be a power of 2. the FFT takes 4x5ms=20 ms to compute
+unsigned long periodLength = 100; //delay between each time we collect analog data (in microseconds). Needs to be changed when samplingFrequency changes 
+const double samplingFrequency = 10000;
 const uint16_t flushFrequency = 3000; //time to wait between flushes
 
 /*
@@ -33,7 +33,7 @@ double vRealZ[samples];
 double vImagZ[samples];
 
 //CAN BUS/ Payload State params
-volatile bool isSampling = false;
+volatile bool isSampling = true;
 volatile bool isScrubReset = false;
 volatile bool isShutDown = false;
 
@@ -65,7 +65,7 @@ extern "C" uint32_t set_arm_clock(uint32_t frequency);
 
 void setup()
 {
-  set_arm_clock(100'000'000);
+  set_arm_clock(600'000'000);
   // initialize the digital pin as an output.
   pinMode(led, OUTPUT);
   Serial.begin(9600);

@@ -84,9 +84,10 @@ uint64_t formatMsg2(float ampZ, uint32_t seconds){
 
 void buildMsg(union my_msg *uMsg1, union my_msg *uMsg2, struct Data dt){
 
-  uint64_t msg1 = formatMsg1(dt.isSampling,dt.frqX, dt.frqY, dt.frqZ, dt.ampX, dt.ampY);
-  uint64_t msg2 = formatMsg2(dt.ampZ,dt.seconds);
- 
+  //uint64_t msg1 = formatMsg1(dt.isSampling,dt.frqX, dt.frqY, dt.frqZ, dt.ampX, dt.ampY);
+  //uint64_t msg2 = formatMsg2(dt.ampZ,dt.seconds);
+  uint64_t msg1 = 0x87654321; //Testing code
+  uint64_t msg2 = 0x00000ba9;
 
   //char buf[100];
   //sprintf(buf, "%llu\t%llu\r\n", msg1, msg2);

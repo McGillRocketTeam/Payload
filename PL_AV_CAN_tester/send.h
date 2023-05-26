@@ -18,6 +18,15 @@ struct Data {
   uint32_t seconds;
 };
 
+typedef struct payload_t {
+  //Data is compressed
+  uint64_t PL1; //Frequency and amplitude
+  uint16_t PL2; //Sampling, minutes, seconds, and start of milliseconds
+  uint8_t PL3; //End of milliseconds
+} payload_t;
+
+payload_t hpayload;
+
 /** 
  *  Trick to split the int into bytes
  *  In a union, all members share the same memory location. So if a float is stored in 'f', and the 
@@ -118,3 +127,90 @@ void sendMsg(uint8_t id, uint8_t payload){
   
 
 }
+
+void AV_FC_Decode(uint32_t id, uint8_t* data) {
+  if (id == 0x300){
+
+    Serial.println("Payload Packet #1");
+    memcpy(&hpayload.PL1, data, sizeof(uint64_t));
+  }
+  else if (id == 0x301){
+
+    Serial.println("Payload Packet #2");
+    memcpy(&hpayload.PL2, data, 2);
+    memcpy(&hpayload.PL3, data+sizeof(uint16_t), 1);
+  }
+  
+}
+
+#define FREQ_X_LENGTH 14
+#define FREQ_Y_LENGTH 14
+#define FREQ_Z_LENGTH 14
+#define A_X_LENGTH 9
+#define A_Y_LENGTH 9
+#define A_Z_LENGTH 9
+
+static int sprintPayload(char* buffer) {
+
+    //Message 1
+
+    uint64_t b = hpayload.PL1;
+    //b = swapLong(b);
+    Serial.println(b,BIN);
+    // b = swapIt(b);
+
+    // uint16_t PL2 = 0b1000100000010001;
+    // Serial.println(PL2, BIN);
+    // PL2 = swapShort(PL2);
+    // Serial.println(PL2, BIN);
+    
+  
+    uint64_t mask;
+  mask = 1;
+  uint32_t state = b & mask;
+  b = b >> 1;
+  mask = ((1 << FREQ_X_LENGTH) - 1);
+    uint32_t freqX = b & mask;
+    b = b >> FREQ_X_LENGTH;
+    uint32_t freqY = b & mask;
+    b = b >> FREQ_Y_LENGTH;
+    uint32_t freqZ = b & mask;
+  b = b >> FREQ_Z_LENGTH;
+    mask = ((1 << A_X_LENGTH) - 1);
+    uint32_t aX = b & mask;
+    b = b >> A_X_LENGTH;
+    uint32_t aY = b & mask;
+   
+    
+    
+    //Message 2
+
+    //uint16_t a = swapShort(radioPacket.data.pl.PL2);
+  uint16_t a = hpayload.PL2;
+    // Serial.println(a, BIN);
+
+    b = (a << 8) + hpayload.PL3;
+    // Serial.println(radioPacket.data.pl.PL3, BIN);
+    // Serial.println(b, BIN);
+    // Serial.println(b, BIN);
+    
+    mask = ((1 << 15) - 1);
+    uint32_t secs = b & mask;
+    b = b >> 15;
+  mask = ((1 <<  A_Z_LENGTH) - 1);
+    uint32_t aZ = b & mask;
+  
+
+
+
+    return sprintf(buffer, "PL_Fx:%lu;PL_Fy:%lu;PL_Fz:%lu;PL_AccX:%lu;PL_AccY:%lu;PL_AccZ:%lu;PL_state:%lu;PL_seconds:%lu;",
+                   freqX,
+                   freqY,
+                   freqZ,
+                   aX,
+                   aY,
+                   aZ,
+                   state,
+                   secs
+           );
+  }
