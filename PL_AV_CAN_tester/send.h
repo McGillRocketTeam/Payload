@@ -128,7 +128,7 @@ void sendMsg(uint8_t id, uint8_t payload){
 
 }
 
-void AV_FC_Decode(uint32_t id, uint8_t* data) {
+void AV_FC_Decode(uint32_t id, const uint8_t* data) {
   if (id == 0x300){
 
     Serial.println("Payload Packet #1");
@@ -156,7 +156,7 @@ static int sprintPayload(char* buffer) {
 
     uint64_t b = hpayload.PL1;
     //b = swapLong(b);
-    Serial.println(b,BIN);
+    Serial.println(b,HEX);
     // b = swapIt(b);
 
     // uint16_t PL2 = 0b1000100000010001;
@@ -175,7 +175,7 @@ static int sprintPayload(char* buffer) {
     uint32_t freqY = b & mask;
     b = b >> FREQ_Y_LENGTH;
     uint32_t freqZ = b & mask;
-  b = b >> FREQ_Z_LENGTH;
+    b = b >> FREQ_Z_LENGTH+3;
     mask = ((1 << A_X_LENGTH) - 1);
     uint32_t aX = b & mask;
     b = b >> A_X_LENGTH;
@@ -187,9 +187,10 @@ static int sprintPayload(char* buffer) {
 
     //uint16_t a = swapShort(radioPacket.data.pl.PL2);
   uint16_t a = hpayload.PL2;
-    // Serial.println(a, BIN);
+  Serial.println(a, HEX);
 
-    b = (a << 8) + hpayload.PL3;
+    b = a + (hpayload.PL3 << 16);
+    Serial.println(b,HEX);
     // Serial.println(radioPacket.data.pl.PL3, BIN);
     // Serial.println(b, BIN);
     // Serial.println(b, BIN);

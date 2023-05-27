@@ -52,12 +52,11 @@ uint64_t formatMsg1(bool isSampling, float frqX, float frqY, float frqZ, float a
   uint64_t roundedFrqX = roundf(frqX);
   if (frqX > 16383) roundedFrqX = 16383; //use 11111111111111 to indicate overflow
 
-  uint64_t roundedAmpX = roundf(ampX * 100);
+  uint64_t roundedAmpX = roundf(ampX*100);
   if (roundedAmpX > 511) roundedAmpX = 511; //use 11111111 to indicate overflow
 
-  uint64_t roundedAmpY = roundf(ampY * 100);
+  uint64_t roundedAmpY = roundf(ampY*100);
   if (roundedAmpY > 511) roundedAmpY = 511; //use 11111111 to indicate overflow
-
 
   formattedMsg1 = (Samplingbit) | ((roundedFrqX & 16383) << 1) | ((roundedFrqY & 16383) << 15)| ((roundedFrqZ & 16383) << 29) | ((roundedAmpX & 511) << 46) | ((roundedAmpY & 511) << 55)   ;
   return formattedMsg1; 
@@ -66,7 +65,7 @@ uint64_t formatMsg1(bool isSampling, float frqX, float frqY, float frqZ, float a
 uint64_t formatMsg2(float ampZ, uint32_t seconds){
   uint64_t formattedMsg2;
    
-  uint64_t roundedAmpZ = roundf(ampZ * 100);
+  uint64_t roundedAmpZ = roundf(ampZ*100);
   if (roundedAmpZ > 511) roundedAmpZ = 511; //use 11111111 to indicate overflow
 
   uint64_t formattedSeconds = 0;
@@ -84,10 +83,10 @@ uint64_t formatMsg2(float ampZ, uint32_t seconds){
 
 void buildMsg(union my_msg *uMsg1, union my_msg *uMsg2, struct Data dt){
 
-  //uint64_t msg1 = formatMsg1(dt.isSampling,dt.frqX, dt.frqY, dt.frqZ, dt.ampX, dt.ampY);
-  //uint64_t msg2 = formatMsg2(dt.ampZ,dt.seconds);
-  uint64_t msg1 = 0x87654321; //Testing code
-  uint64_t msg2 = 0x00000ba9;
+  uint64_t msg1 = formatMsg1(dt.isSampling,dt.frqX, dt.frqY, dt.frqZ, dt.ampX, dt.ampY);
+  uint64_t msg2 = formatMsg2(dt.ampZ,dt.seconds);
+  //uint64_t msg1 = 0x21EDCBA987654321; //Testing code
+  //uint64_t msg2 = 0x654321;
 
   //char buf[100];
   //sprintf(buf, "%llu\t%llu\r\n", msg1, msg2);
