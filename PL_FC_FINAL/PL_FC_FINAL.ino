@@ -22,15 +22,20 @@ const uint16_t flushFrequency = 3000; //time to wait between flushes
 #define SCL_PLOT 0x03
 
 // x-axis collection
-double adjFactor = 470;
 double vRealX[samples];
 double vImagX[samples];
+double GainX=7;
+double adjFactorX = 470*0.56*GainX;
 // y-axis ccollection
 double vRealY[samples];
 double vImagY[samples];
+double GainY=4;
+double adjFactorY = 470*0.56*GainY;
 // z - axis collection
 double vRealZ[samples];
 double vImagZ[samples];
+double GainZ=1;
+double adjFactorZ = 470*0.56*GainZ;
 
 //CAN BUS/ Payload State params
 volatile bool isSampling = true;
@@ -273,11 +278,11 @@ void loop()
     if (counter == samples)
     {
       float frqX = calcFFT(vRealX, vImagX, samples);
-      float ampX = PI*vRealX[(int) (frqX*samples/samplingFrequency)]/(samples*adjFactor);
+      float ampX = PI*vRealX[(int) (frqX*samples/samplingFrequency)]/(samples*adjFactorX);
       float frqY = calcFFT(vRealY, vImagY, samples);
-      float ampY = PI*vRealY[(int) (frqY*samples/samplingFrequency)]/(samples*adjFactor);
+      float ampY = PI*vRealY[(int) (frqY*samples/samplingFrequency)]/(samples*adjFactorY);
       float frqZ = calcFFT(vRealZ, vImagZ, samples);
-      float ampZ = PI*vRealZ[(int) (frqZ*samples/samplingFrequency)]/(samples*adjFactor);
+      float ampZ = PI*vRealZ[(int) (frqZ*samples/samplingFrequency)]/(samples*adjFactorZ);
       uint32_t tS = getTime();
       dataCollection.println(",,,,"+String(tS) + "," + String(frqX) + "," + String(frqY) + "," + String(frqZ) + "," + String(ampX) +"," + String(ampY) + "," + String(ampZ));
 
