@@ -24,12 +24,12 @@ const uint16_t flushFrequency = 3000; //time to wait between flushes
 // x-axis collection
 double vRealX[samples];
 double vImagX[samples];
-double GainX=7;
+double GainX=4.34;
 double adjFactorX = 470*0.56*GainX;
 // y-axis ccollection
 double vRealY[samples];
 double vImagY[samples];
-double GainY=4;
+double GainY=1.96;
 double adjFactorY = 470*0.56*GainY;
 // z - axis collection
 double vRealZ[samples];
@@ -50,17 +50,15 @@ uint32_t getTime() { //offset time gets update each time AV sends a scrub CAN me
 
 File dataCollection;
 char fName[30];
-bool serialTest=true;
 bool overwrite=false;
 //LED params. By default the params on 5 next line are for no LED blinking
 int led = 13;
-int blinkState = 0;
 
 uint32_t t = getTime();
 unsigned long lastExec = micros();
 unsigned long delaySinceSample = 0;
 uint32_t t_wait = 0;
-uint32_t t_max = 4294967295;
+uint32_t t_max = 18000000;
 //FFT param
 int counter = 0;
 //Flush param
