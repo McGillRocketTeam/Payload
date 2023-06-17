@@ -312,6 +312,9 @@ void loop()
   }
   else{
     delay(100);
+	if(dataCollection) {
+        dataCollection.close();
+    }
   }
   
 }
