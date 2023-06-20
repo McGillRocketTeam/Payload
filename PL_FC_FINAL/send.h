@@ -51,11 +51,13 @@ uint64_t formatMsg1(bool isSampling, float frqX, float frqY, float frqZ, float a
 
   uint64_t roundedFrqX = roundf(frqX);
   if (frqX > 16383) roundedFrqX = 16383; //use 11111111111111 to indicate overflow
-
-  uint64_t roundedAmpX = roundf(ampX*100);
+  
+  //Value is x100 and %100 at groundstation to get 2 decimal places. Max value is 37m/s^2 with gain 4.34x, so we x13 to use full 511 range
+  uint64_t roundedAmpX = roundf(ampX*100*13);
   if (roundedAmpX > 511) roundedAmpX = 511; //use 11111111 to indicate overflow
 
-  uint64_t roundedAmpY = roundf(ampY*100);
+  //Value is x100 and %100 at groundstation to get 2 decimal places. Max value is 80.5m/s^2 with gain 2x, so we x6 to use full 511 range
+  uint64_t roundedAmpY = roundf(ampY*100*6);
   if (roundedAmpY > 511) roundedAmpY = 511; //use 11111111 to indicate overflow
 
   formattedMsg1 = (Samplingbit) | ((roundedFrqX & 16383) << 1) | ((roundedFrqY & 16383) << 15)| ((roundedFrqZ & 16383) << 29) | ((roundedAmpX & 511) << 46) | ((roundedAmpY & 511) << 55)   ;
@@ -64,8 +66,9 @@ uint64_t formatMsg1(bool isSampling, float frqX, float frqY, float frqZ, float a
 
 uint64_t formatMsg2(float ampZ, uint32_t seconds){
   uint64_t formattedMsg2;
-   
-  uint64_t roundedAmpZ = roundf(ampZ*100);
+
+  //Value is x100 and %100 at groundstation to get 2 decimal places. Max value is 161m/s^2 with gain 1x, so we x3 to use full 511 range
+  uint64_t roundedAmpZ = roundf(ampZ*100*3); //Data on grounstation is scaled by 3,6,13 times compared to SD card
   if (roundedAmpZ > 511) roundedAmpZ = 511; //use 11111111 to indicate overflow
 
   uint64_t formattedSeconds = 0;

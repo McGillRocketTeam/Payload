@@ -282,7 +282,7 @@ void loop()
       float frqZ = calcFFT(vRealZ, vImagZ, samples);
       float ampZ = PI*vRealZ[(int) (frqZ*samples/samplingFrequency)]/(samples*adjFactorZ);
       uint32_t tS = getTime();
-      dataCollection.println(",,,,"+String(tS) + "," + String(frqX) + "," + String(frqY) + "," + String(frqZ) + "," + String(ampX) +"," + String(ampY) + "," + String(ampZ));
+      dataCollection.println(",,,,"+String(tS) + "," + String(frqX) + "," + String(frqY) + "," + String(frqZ) + "," + String(ampX,4) +"," + String(ampY,4) + "," + String(ampZ,4));
 
       /* Sending data on CANBus*/
       uint32_t t1 = getTime();
@@ -312,7 +312,7 @@ void loop()
   }
   else{
     delay(100);
-	if(dataCollection) {
+	  if(dataCollection) {
         dataCollection.close();
     }
   }
