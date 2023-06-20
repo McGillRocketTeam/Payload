@@ -290,7 +290,7 @@ void loop()
       uint32_t seconds_forCAN = (uint32_t) roundf(t1/1000.0);
       // Initialize the structure with relevant data
       struct Data dt = {frqX, frqY, frqZ, ampX, ampY, ampZ, isSampling, seconds_forCAN};
-      //struct Data dt = {4001.2, 3506.7, 2222.2, 257.5, 112.1, 497.1, 1, 30767};
+      //struct Data dt = {4001.2, 3506.7, 2222.2, 0.111111, 0.111111, 0.111111, 1, 30767};
 
       // Declare 3 unions which will contain the messages to be sent
       union my_msg m1;
