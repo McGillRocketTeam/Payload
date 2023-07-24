@@ -111,7 +111,7 @@ void buildMsg(union my_msg *uMsg1, union my_msg *uMsg2, struct Data dt){
  * The second transmission will deliver msg3 (only buffers 0,1,2 will contain relevant data: 3 bytes) with CANID 0x301
  * 
  */
-void sendMsg(uint8_t id, uint8_t payload){
+void sendMsg(uint16_t id, uint8_t payload){
   can2.events();
 
   msg.id = id;
